@@ -288,10 +288,19 @@ void DependencyParser::gen_dictionaries(
      *  - can add other features here, aside from /distance/
      */
     cerr << "collect dynamic features (e.g. distances)" << endl;
-    if (config.use_distance)
+    if (config.use_distance || config.use_valency)
     {
         collect_dynamic_features(sents, trees);
-        known_distances.push_back(Config::UNKNOWN_DIST);
+        /*
+        known_distances.push_back(1);
+        known_distances.push_back(2);
+        known_distances.push_back(3);
+        known_distances.push_back(4);
+        known_distances.push_back(5);
+        known_distances.push_back(6);
+        */
+        known_distances.push_back(Config::UNKNOWN_INT);
+        // known_valencies.push_back(Config::UNKNOWN);
     }
 
     generate_ids();
@@ -310,6 +319,13 @@ void DependencyParser::gen_dictionaries(
 
     if (config.use_distance)
         cerr << "#Distances: " << known_distances.size() << endl;
+    if (config.use_valency)
+    {
+        cerr << "#Valencies: " << known_valencies.size() << endl;
+        for (size_t j = 0; j < known_valencies.size(); ++j)
+            cerr << known_valencies[j] << ", ";
+        cerr << endl;
+    }
 }
 
 void DependencyParser::collect_dynamic_features(
@@ -317,6 +333,7 @@ void DependencyParser::collect_dynamic_features(
         vector<DependencyTree> & trees)
 {
     vector<int> all_distances;
+    vector<string> all_valencies;
 
     vector<string> ldict = known_labels;
     ldict.pop_back();
@@ -324,6 +341,7 @@ void DependencyParser::collect_dynamic_features(
 
     for (size_t i = 0; i < sents.size(); ++i)
     {
+        // if (i == 20652) continue;
         if (trees[i].is_projective())
         {
             Configuration c(sents[i]);
@@ -331,7 +349,15 @@ void DependencyParser::collect_dynamic_features(
             {
                 string oracle = monitor->get_oracle(c, trees[i]);
                 monitor->apply(c, oracle);
+
                 all_distances.push_back(c.get_distance());
+
+                int k = c.get_stack(1);
+                all_valencies.push_back(c.get_lvalency(k));
+                all_valencies.push_back(c.get_rvalency(k));
+
+                k = c.get_stack(0);
+                all_valencies.push_back(c.get_lvalency(k));
             }
         }
     }
@@ -339,6 +365,8 @@ void DependencyParser::collect_dynamic_features(
     monitor = NULL; delete monitor;
 
     known_distances = Util::generate_dict(all_distances);
+    all_valencies.push_back(Config::UNKNOWN);
+    known_valencies = Util::generate_dict(all_valencies);
 }
 
 void DependencyParser::setup_classifier_for_training(
@@ -353,6 +381,8 @@ void DependencyParser::setup_classifier_for_training(
         E_entries += known_words.size();
     if (config.use_distance)
         E_entries += known_distances.size();
+    if (config.use_valency)
+        E_entries += known_valencies.size();
 
     Mat<double> E(0.0,
                   E_entries,
@@ -365,8 +395,8 @@ void DependencyParser::setup_classifier_for_training(
     int n_actions = (config.labeled) ? (known_labels.size() * 2 - 1) : 3;
     Mat<double> W2(0.0, n_actions, config.hidden_size);
 
-    double W1_init_range = sqrt(6.0 / (W1.nrows() + W1.ncols()));
     // Randomly initialize weight matrices / vectors
+    double W1_init_range = sqrt(6.0 / (W1.nrows() + W1.ncols()));
     for (int i = 0; i < W1.nrows(); ++i)
         for (int j = 0; j < W1.ncols(); ++j)
             W1[i][j] = (Util::rand_double() * 2 - 1) * W1_init_range;
@@ -468,6 +498,10 @@ void DependencyParser::generate_ids()
     if (config.use_distance)
         for (size_t i = 0; i < known_distances.size(); ++i)
             distance_ids[known_distances[i]] = index++;
+
+    if (config.use_valency)
+        for (size_t i = 0; i < known_valencies.size(); ++i)
+            valency_ids[known_valencies[i]] = index++;
 
     /* debug
     cerr << "word_ids" << endl;
@@ -689,6 +723,7 @@ void DependencyParser::save_model(const char * filename)
            << "pos=" << known_poss.size()  << "\n"
            << "label=" << known_labels.size() << "\n"
            << "dist=" << known_distances.size() << "\n"
+           << "valency=" << known_valencies.size() << "\n"
            << "embeddingsize=" << E.ncols() << "\n"
            << "hiddensize=" << b1.size() << "\n"
            << "numtokens=" << W1.ncols() / E.ncols() << "\n"
@@ -726,6 +761,15 @@ void DependencyParser::save_model(const char * filename)
         for (size_t i = 0; i < known_distances.size(); ++i)
         {
             output << known_distances[i];
+            for (int j = 0; j < E.ncols(); ++j)
+                output << " " << E[index][j];
+            output << "\n";
+            index += 1;
+        }
+    if (config.use_valency)
+        for (size_t i = 0; i < known_valencies.size(); ++i)
+        {
+            output << known_valencies[i];
             for (int j = 0; j < E.ncols(); ++j)
                 output << " " << E[index][j];
             output << "\n";
@@ -819,6 +863,7 @@ vector<int> DependencyParser::get_features(Configuration& c)
         f_word.push_back(get_word_id(c.get_word(index)));
         f_pos.push_back(get_pos_id(c.get_pos(index)));
         f_label.push_back(get_label_id(c.get_label(index)));
+
     }
 
     vector<int> features;
@@ -838,6 +883,15 @@ vector<int> DependencyParser::get_features(Configuration& c)
 
     if (config.use_distance)
         features.push_back(get_distance_id(c.get_distance()));
+
+    if (config.use_valency)
+    {
+        int index = c.get_stack(1);
+        features.push_back(get_valency_id(c.get_lvalency(index)));
+        features.push_back(get_valency_id(c.get_rvalency(index)));
+        index = c.get_stack(0);
+        features.push_back(get_valency_id(c.get_lvalency(index)));
+    }
 
     return features;
 }
@@ -860,7 +914,7 @@ int DependencyParser::get_word_id(const string & s)
     // if fix_word_embeddings, then ignore cases
     string sl = s; // lower case form of s (if necessary)
     // if (config.fix_word_embeddings)
-    //     sl = str_tolower(sl);
+    //      sl = str_tolower(sl);
 
     // adapt to `delexicalized`, introduce Config::NONEXIST
     return (word_ids.find(sl) == word_ids.end())
@@ -882,11 +936,18 @@ int DependencyParser::get_label_id(const string & s)
     return label_ids[s];
 }
 
-int DependencyParser::get_distance_id(const int d)
+int DependencyParser::get_distance_id(const int & d)
 {
     return (distance_ids.find(d) == distance_ids.end())
-                ? distance_ids[Config::UNKNOWN_DIST]
+                ? distance_ids[Config::UNKNOWN_INT]
                 : distance_ids[d];
+}
+
+int DependencyParser::get_valency_id(const string & v)
+{
+    return (valency_ids.find(v) == valency_ids.end())
+                ? valency_ids[Config::UNKNOWN]
+                : valency_ids[v];
 }
 
 void DependencyParser::predict(
@@ -958,11 +1019,11 @@ void DependencyParser::load_model(const char * filename)
     double start = get_time();
 
     ifstream input(filename);
-    int n_dict = 0, n_pos = 0, n_label = 0, n_dist = 0;
+    int n_dict = 0, n_pos = 0, n_label = 0, n_dist = 0, n_valency = 0;
     int E_size = 0, h_size = 0, n_tokens = 0, n_pre_computed = 0;
 
     string s;
-    for (int k = 0; k < 8; ++k)
+    for (int k = 0; k < 9; ++k)
     {
         getline(input, s);
         vector<string> kv = split_by_sep(s, "=");
@@ -982,15 +1043,18 @@ void DependencyParser::load_model(const char * filename)
                 n_dist = val;
                 break;
             case 4:
-                E_size = val;
+                n_valency = val;
                 break;
             case 5:
-                h_size = val;
+                E_size = val;
                 break;
             case 6:
-                n_tokens = val;
+                h_size = val;
                 break;
             case 7:
+                n_tokens = val;
+                break;
+            case 8:
                 n_pre_computed = val;
                 break;
             default:
@@ -1002,6 +1066,7 @@ void DependencyParser::load_model(const char * filename)
     known_poss.clear();
     known_labels.clear();
     known_distances.clear();
+    known_valencies.clear();
 
     int index = 0;
     int E_entries = n_pos + n_label;
@@ -1009,6 +1074,8 @@ void DependencyParser::load_model(const char * filename)
         E_entries += n_dict;
     if (config.use_distance)
         E_entries += n_dist;
+    if (config.use_valency)
+        E_entries += n_valency;
 
     Mat<double> E(E_entries, E_size);
 
@@ -1052,6 +1119,16 @@ void DependencyParser::load_model(const char * filename)
             getline(input, s);
             vector<string> sep = split(s);
             known_distances.push_back(to_int(sep[0]));
+            for (int j = 0; j < E_size; ++j)
+                E[index][j] = to_double_sci(sep[j+1]);
+            index += 1;
+        }
+    if (config.use_valency)
+        for (int i = 0; i < n_valency; ++i)
+        {
+            getline(input, s);
+            vector<string> sep = split(s);
+            known_valencies.push_back(sep[0]);
             for (int j = 0; j < E_size; ++j)
                 E[index][j] = to_double_sci(sep[j+1]);
             index += 1;
@@ -1117,6 +1194,8 @@ void DependencyParser::load_model(const string & filename)
 /**
  * load model trained in source language
  *  and embeddings from target language
+ *
+ * NB: only used in testing time
  */
 void DependencyParser::load_model_cl(
         const char * filename,
@@ -1127,11 +1206,11 @@ void DependencyParser::load_model_cl(
     double start = get_time();
 
     ifstream input(filename);
-    int n_dict = 0, n_pos = 0, n_label = 0, n_dist = 0;
+    int n_dict = 0, n_pos = 0, n_label = 0, n_dist = 0, n_valency = 0;
     int E_size = 0, h_size = 0, n_tokens = 0, n_pre_computed = 0;
 
     string s;
-    for (int k = 0; k < 8; ++k)
+    for (int k = 0; k < 9; ++k)
     {
         getline(input, s);
         vector<string> kv = split_by_sep(s, "=");
@@ -1151,15 +1230,18 @@ void DependencyParser::load_model_cl(
                 n_dist = val;
                 break;
             case 4:
-                E_size = val;
+                n_valency = val;
                 break;
             case 5:
-                h_size = val;
+                E_size = val;
                 break;
             case 6:
-                n_tokens = val;
+                h_size = val;
                 break;
             case 7:
+                n_tokens = val;
+                break;
+            case 8:
                 n_pre_computed = val;
                 break;
             default:
@@ -1171,6 +1253,7 @@ void DependencyParser::load_model_cl(
     known_poss.clear();
     known_labels.clear();
     known_distances.clear();
+    known_valencies.clear();
 
     read_embed_file(clemb);
     int n_cldict = embeddings.nrows(); // vocab size of target language
@@ -1179,6 +1262,8 @@ void DependencyParser::load_model_cl(
     int E_entries = n_cldict + 3 + n_pos + n_label; // 3 -> -UNKNOWN-, -NULL-, -ROOT-
     if (config.use_distance)
         E_entries += n_dist;
+    if (config.use_valency)
+        E_entries += n_valency;
 
     Mat<double> E(E_entries, E_size);
     unordered_map<string, int>::iterator iter = embed_ids.begin();
@@ -1244,6 +1329,16 @@ void DependencyParser::load_model_cl(
             getline(input, s);
             vector<string> sep = split(s);
             known_distances.push_back(to_int(sep[0]));
+            for (int j = 0; j < E_size; ++j)
+                E[index][j] = to_double_sci(sep[j+1]);
+            index += 1;
+        }
+    if (config.use_valency)
+        for (int i = 0; i < n_valency; ++i)
+        {
+            getline(input, s);
+            vector<string> sep = split(s);
+            known_valencies.push_back(sep[0]);
             for (int j = 0; j < E_size; ++j)
                 E[index][j] = to_double_sci(sep[j+1]);
             index += 1;

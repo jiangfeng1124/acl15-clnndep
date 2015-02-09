@@ -92,7 +92,8 @@ class DependencyParser
         int get_pos_id(const std::string & s);
         int get_label_id(const std::string & s);
 
-        int get_distance_id(const int d);
+        int get_distance_id(const int & d);
+        int get_valency_id(const std::string & v);
 
     private:
         void generate_ids();
@@ -103,12 +104,14 @@ class DependencyParser
         std::vector<std::string> known_labels;
 
         std::vector<int> known_distances;
+        std::vector<std::string> known_valencies;
 
         std::unordered_map<std::string, int> word_ids;
         std::unordered_map<std::string, int> pos_ids;
         std::unordered_map<std::string, int> label_ids;
 
         std::unordered_map<int, int> distance_ids;
+        std::unordered_map<std::string, int> valency_ids;
 
         std::vector<int> pre_computed_ids;
         NNClassifier * classifier;

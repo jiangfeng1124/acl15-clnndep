@@ -1,6 +1,7 @@
 #include "Configuration.h"
 #include "Config.h"
 #include "strutils.h"
+#include <cassert>
 
 using namespace std;
 
@@ -10,6 +11,9 @@ Configuration::Configuration(Configuration& c)
     buffer = c.buffer;
     tree   = c.tree;
     sent   = c.sent;
+
+    lvalency = c.lvalency;
+    rvalency = c.rvalency;
 }
 
 Configuration::Configuration(DependencySent& s)
@@ -22,12 +26,18 @@ void Configuration::init(DependencySent& s)
     stack.clear();
     buffer.clear();
 
+    lvalency.clear();
+    rvalency.clear();
+
     sent = s;
     for (int i = 1; i <= sent.n; ++i)
     {
         tree.add(Config::NONEXIST, Config::UNKNOWN);
         buffer.push_back(i);
     }
+
+    lvalency.resize(sent.n + 1, 0);
+    rvalency.resize(sent.n + 1, 0);
 
     stack.push_back(0);
 }
@@ -108,7 +118,30 @@ int Configuration::get_buffer(int k)
 
 int Configuration::get_distance()
 {
-    return abs(get_stack(0) - get_buffer(0));
+    // return abs(get_stack(0) - get_buffer(0));
+    return encode_distance(get_stack(0), get_stack(1));
+}
+
+int Configuration::encode_distance(const int & h, const int & m)
+{
+    int diff;
+    diff = h - m;
+    assert(diff != 0);
+
+    if (diff < 0) diff = -diff;
+    if (diff > 10) diff = 6;
+    else if (diff > 5) diff = 5;
+
+    return diff;
+}
+
+string Configuration::encode_valency(const string & typ, const int & k)
+{
+    int v = k;
+    if (v > 10) v = 6;
+    else if (v > 5) v = 5;
+
+    return typ + to_str(v);
 }
 
 /**
@@ -144,6 +177,48 @@ string Configuration::get_pos(int k)
 void Configuration::add_arc(int h, int m, const string & l)
 {
     tree.set(m, h, l);
+}
+
+string Configuration::get_lvalency(int k)
+{
+    if (k < 0 || k > tree.n)
+        return Config::UNKNOWN;
+
+    return encode_valency("L", lvalency[k]);
+}
+
+string Configuration::get_lvalency_fc(int k)
+{
+    if (k < 0 || k > tree.n)
+        return Config::UNKNOWN;
+        // return Config::NONEXIST;
+
+    int cnt = 0;
+    for (int i = 1; i < k; ++i)
+        if (tree.get_head(i) == k)
+            cnt += 1;
+    return "L" + to_str(cnt);
+}
+
+string Configuration::get_rvalency(int k)
+{
+    if (k < 0 || k > tree.n)
+        return Config::UNKNOWN;
+
+    return encode_valency("R", rvalency[k]);
+}
+
+string Configuration::get_rvalency_fc(int k)
+{
+    if (k < 0 || k > tree.n)
+        return Config::UNKNOWN;
+        // return Config::NONEXIST;
+
+    int cnt = 0;
+    for (int i = tree.n; i > k; --i)
+        if (tree.get_head(i) == k)
+            cnt += 1;
+    return "R" + to_str(cnt);
 }
 
 int Configuration::get_left_child(int k, int cnt)

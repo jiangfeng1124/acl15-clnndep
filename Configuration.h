@@ -28,7 +28,6 @@ class Configuration
         // remove second top elements in stack
         bool remove_second_top_stack();
 
-
         int get_stack_size();
 
         int get_buffer_size();
@@ -44,6 +43,12 @@ class Configuration
         int get_buffer(int k);
 
         int get_distance();
+
+        std::string get_lvalency(int k);
+        std::string get_lvalency_fc(int k); // for debug
+
+        std::string get_rvalency(int k);
+        std::string get_rvalency_fc(int k); // for debug
 
         std::string get_word(int k);
 
@@ -67,6 +72,10 @@ class Configuration
 
         std::string info();
 
+    private:
+        int encode_distance(const int & h, const int & m);
+        std::string encode_valency(const std::string & typ, const int & k);
+
     public:
         /**
          * Not sure which one of [vector/list]
@@ -77,6 +86,9 @@ class Configuration
 
         DependencyTree tree;
         DependencySent sent;
+
+        std::vector<int> lvalency;
+        std::vector<int> rvalency;
 };
 
 #endif

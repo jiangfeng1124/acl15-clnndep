@@ -9,7 +9,7 @@ class Config
     public:
         const static std::string UNKNOWN;
         const static std::string ROOT;
-        const static int UNKNOWN_DIST;
+        const static int UNKNOWN_INT;
 
         /**
          * for printing message
@@ -85,6 +85,19 @@ class Config
          * whether use distance feature
          */
         bool use_distance;
+        int distance_embedding_size; // unused
+
+        /**
+         * whether use valency feature
+         */
+        bool use_valency;
+        int valency_embedding_size;
+
+        /**
+         * whether use cluster feature
+         */
+        bool use_cluster;
+        int cluster_embedding_size;
 
     public:
         Config();

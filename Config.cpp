@@ -13,7 +13,7 @@ const string Config::ROOT      = "-ROOT-";
 const string Config::NIL       = "-NULL-";
 const string Config::SEPERATOR = "#######";
 const int Config::NONEXIST     = -1;
-const int Config::UNKNOWN_DIST = -1;
+const int Config::UNKNOWN_INT  = -1;
 
 Config::Config()
 {
@@ -48,6 +48,11 @@ void Config::init()
     delexicalized           = false;
     labeled                 = true;
     use_distance            = false;
+    distance_embedding_size = 10;
+    use_valency             = false;
+    valency_embedding_size  = 10;
+    use_cluster             = false;
+    cluster_embedding_size  = 50;
 }
 
 void Config::set_properties(const char * filename)
@@ -91,6 +96,9 @@ void Config::set_properties(const char * filename)
     cfg_set_int(props, "num_pre_computed", num_pre_computed);
     cfg_set_int(props, "eval_per_iter",    eval_per_iter);
     cfg_set_int(props, "clear_gradient_per_iter", clear_gradient_per_iter);
+    cfg_set_int(props, "distance_embedding_size", distance_embedding_size);
+    cfg_set_int(props, "valency_embedding_size",  valency_embedding_size);
+    cfg_set_int(props, "cluster_embedding_size",  cluster_embedding_size);
 
     cfg_set_double(props, "init_range",     init_range);
     cfg_set_double(props, "ada_eps",        ada_eps);
@@ -103,6 +111,8 @@ void Config::set_properties(const char * filename)
     cfg_set_boolean(props, "delexicalized", delexicalized);
     cfg_set_boolean(props, "labeled", labeled);
     cfg_set_boolean(props, "use_distance", use_distance);
+    cfg_set_boolean(props, "use_valency", use_valency);
+    cfg_set_boolean(props, "use_cluster", use_cluster);
 }
 
 void Config::cfg_set_int(
@@ -151,26 +161,31 @@ Config::Config(const string& filename)
 
 void Config::print_info()
 {
-    cerr << "training_threads   = " << training_threads     << endl;
-    cerr << "word_cut_off       = " << word_cut_off         << endl;
-    cerr << "init_range         = " << init_range           << endl;
-    cerr << "max_iter           = " << max_iter             << endl;
-    cerr << "batch_size         = " << batch_size           << endl;
-    cerr << "ada_eps            = " << ada_eps              << endl;
-    cerr << "ada_alpha          = " << ada_alpha            << endl;
-    cerr << "reg_parameter      = " << reg_parameter        << endl;
-    cerr << "dropout_prob       = " << dropout_prob         << endl;
-    cerr << "hidden_size        = " << hidden_size          << endl;
-    cerr << "embedding_size     = " << embedding_size       << endl;
-    cerr << "num_tokens         = " << num_tokens           << endl;
-    cerr << "num_pre_computed   = " << num_pre_computed     << endl;
-    cerr << "eval_per_iter      = " << eval_per_iter        << endl;
+    cerr << "training_threads        = " << training_threads        << endl;
+    cerr << "word_cut_off            = " << word_cut_off            << endl;
+    cerr << "init_range              = " << init_range              << endl;
+    cerr << "max_iter                = " << max_iter                << endl;
+    cerr << "batch_size              = " << batch_size              << endl;
+    cerr << "ada_eps                 = " << ada_eps                 << endl;
+    cerr << "ada_alpha               = " << ada_alpha               << endl;
+    cerr << "reg_parameter           = " << reg_parameter           << endl;
+    cerr << "dropout_prob            = " << dropout_prob            << endl;
+    cerr << "hidden_size             = " << hidden_size             << endl;
+    cerr << "embedding_size          = " << embedding_size          << endl;
+    cerr << "num_tokens              = " << num_tokens              << endl;
+    cerr << "num_pre_computed        = " << num_pre_computed        << endl;
+    cerr << "eval_per_iter           = " << eval_per_iter           << endl;
+    cerr << "save_intermediate       = " << save_intermediate       << endl;
     cerr << "clear_gradient_per_iter = " << clear_gradient_per_iter << endl;
-    cerr << "save_intermediate   = " << save_intermediate   << endl;
-    cerr << "fix_word_embeddings = " << fix_word_embeddings << endl;
-    cerr << "delexicalized       = " << delexicalized       << endl;
-    cerr << "labeled             = " << labeled             << endl;
-    cerr << "use_distance        = " << use_distance        << endl;
+    cerr << "fix_word_embeddings     = " << fix_word_embeddings     << endl;
+    cerr << "delexicalized           = " << delexicalized           << endl;
+    cerr << "labeled                 = " << labeled                 << endl;
+    cerr << "use_distance            = " << use_distance            << endl;
+    cerr << "use_valency             = " << use_valency             << endl;
+    cerr << "use_cluster             = " << use_cluster             << endl;
+    cerr << "distance_embedding_size = " << distance_embedding_size << endl;
+    cerr << "valency_embedding_size  = " << valency_embedding_size  << endl;
+    cerr << "cluster_embedding_size  = " << cluster_embedding_size  << endl;
 }
 
 int test_config(int argc, char** argv)

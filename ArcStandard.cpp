@@ -82,12 +82,14 @@ void ArcStandard::apply(Configuration& c, const string& t)
     {
         c.add_arc(w2, w1, t.substr(2, t.length() - 3));
         c.remove_second_top_stack();
+        c.lvalency[w2] += 1;
     }
     // Right Reduce
     else if (startswith(t, "R"))
     {
         c.add_arc(w1, w2, t.substr(2, t.length() - 3));
         c.remove_top_stack();
+        c.rvalency[w1] += 1;
     }
     // Shift
     else
