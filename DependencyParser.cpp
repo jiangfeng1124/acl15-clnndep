@@ -914,7 +914,7 @@ int DependencyParser::get_word_id(const string & s)
     // if fix_word_embeddings, then ignore cases
     string sl = s; // lower case form of s (if necessary)
     // if (config.fix_word_embeddings)
-    //      sl = str_tolower(sl);
+    //     sl = str_tolower(sl);
 
     // adapt to `delexicalized`, introduce Config::NONEXIST
     return (word_ids.find(sl) == word_ids.end())
