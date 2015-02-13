@@ -1,4 +1,4 @@
-CC = g++ -std=c++11 -O3
+CC = g++ -std=c++11 -O3 -g
 
 CFLAGS = -pthread -Wall -lm
 INCLUDE = -I utils/

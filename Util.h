@@ -149,13 +149,14 @@ class Util
                 {
                     std::string word   = sep[1];
                     std::string pos    = sep[3];
-                    //// std::string pos   = sep[4];
+                    // std::string pos   = sep[4];
+                    std::string cluster = sep[5];
                     std::string deprel = sep[7];
                     int head = to_int(sep[6]);
                     // std::string deprel = sep[9];
                     // int head = to_int(sep[8]);
 
-                    sent.add(word, pos);
+                    sent.add(word, pos, cluster);
 
                     if (labeled)
                         tree.add(head, deprel);

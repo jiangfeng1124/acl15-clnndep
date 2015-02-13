@@ -30,6 +30,12 @@ DependencyParser::~DependencyParser()
 {
     system = NULL; delete system;
     classifier = NULL; delete classifier;
+    word_ids.clear();
+    pos_ids.clear();
+    label_ids.clear();
+    distance_ids.clear();
+    valency_ids.clear();
+    cluster_ids.clear();
 }
 
 void DependencyParser::train(
@@ -99,9 +105,9 @@ void DependencyParser::train(
     /**
      * Gradient Check
      */
+    classifier->check_gradient();
     // classifier->check_gradient();
-    // classifier->check_gradient();
-    // return ;
+    return ;
 
     /**
      * train classifier by calling classifier.train
@@ -209,7 +215,7 @@ void DependencyParser::gen_dictionaries(
     vector<string> all_words;
     vector<string> all_poss;
     vector<string> all_labels;
-
+    vector<string> all_clusters;
 
     for (size_t i = 0; i < sents.size(); ++i)
     {
@@ -237,6 +243,12 @@ void DependencyParser::gen_dictionaries(
                 all_poss.end(),
                 sents[i].poss.begin(),
                 sents[i].poss.end());
+
+        if (config.use_cluster)
+            all_clusters.insert(
+                    all_clusters.end(),
+                    sents[i].clusters.begin(),
+                    sents[i].clusters.end());
     }
 
     string root_label = "";
@@ -258,6 +270,9 @@ void DependencyParser::gen_dictionaries(
     known_poss   = Util::generate_dict(all_poss);
     known_labels = Util::generate_dict(all_labels);
 
+    if (config.use_cluster)
+        known_clusters = Util::generate_dict(all_clusters);
+
     /**
      * Usage of these symbols:
      *
@@ -272,6 +287,14 @@ void DependencyParser::gen_dictionaries(
     known_poss.push_back(Config::UNKNOWN);
     known_poss.push_back(Config::NIL);
     known_poss.push_back(Config::ROOT);
+
+    if (config.use_cluster)
+    {
+        // Config::UNKNOWN has already been in known_clusters
+        // known_clusters.push_back(Config::UNKNOWN);
+        known_clusters.push_back(Config::NIL);
+        known_clusters.push_back(Config::ROOT);
+    }
 
     if (config.labeled)
     {
@@ -306,8 +329,9 @@ void DependencyParser::gen_dictionaries(
     generate_ids();
 
     cerr << config.SEPERATOR << endl;
-    cerr << "#Word:  " << known_words.size()  << endl;
-    cerr << "#POS:   " << known_poss.size()   << endl;
+    cerr << "#Word:     " << known_words.size()    << endl;
+    cerr << "#POS:      " << known_poss.size()     << endl;
+    cerr << "#Clusters: " << known_clusters.size() << endl;
 
     if (config.labeled)
     {
@@ -374,24 +398,47 @@ void DependencyParser::setup_classifier_for_training(
         vector<DependencyTree> & trees,
         const char * embed_file)
 {
-    int E_entries = known_poss.size();
-    if (config.labeled)
-        E_entries += known_labels.size();
-    if (!config.delexicalized)
-        E_entries += known_words.size();
-    if (config.use_distance)
-        E_entries += known_distances.size();
-    if (config.use_valency)
-        E_entries += known_valencies.size();
+    int Eb_entries = 0;
+    int Ed_entries = 0, Ev_entries = 0, Ec_entries = 0;
 
-    Mat<double> E(0.0,
-                  E_entries,
+    if (config.use_postag)
+        Eb_entries = known_poss.size();
+    if (config.labeled)
+        Eb_entries += known_labels.size();
+    if (!config.delexicalized)
+        Eb_entries += known_words.size();
+
+    if (config.use_distance)
+        Ed_entries = known_distances.size();
+    if (config.use_valency)
+        Ev_entries = known_valencies.size();
+    if (config.use_cluster)
+        Ec_entries = known_clusters.size();
+
+    Mat<double> Eb(0.0,
+                  Eb_entries,
                   config.embedding_size);
-    Mat<double> W1(0.0,
-                   config.hidden_size,
-                   config.embedding_size * config.num_tokens);
-    Vec<double> b1(0.0,
-                   config.hidden_size);
+    Mat<double> Ed(0.0,
+                  Ed_entries,
+                  config.distance_embedding_size);
+    Mat<double> Ev(0.0,
+                  Ev_entries,
+                  config.valency_embedding_size);
+    Mat<double> Ec(0.0,
+                  Ec_entries,
+                  config.cluster_embedding_size);
+
+    int W1_ncol = config.embedding_size * config.num_basic_tokens;
+    if (config.use_distance)
+        W1_ncol += config.distance_embedding_size * config.num_dist_tokens;
+    if (config.use_valency)
+        W1_ncol += config.valency_embedding_size * config.num_valency_tokens;
+    if (config.use_cluster)
+        W1_ncol += config.cluster_embedding_size * config.num_cluster_tokens;
+
+    cerr << "W1_ncol = " << W1_ncol << endl;
+    Mat<double> W1(0.0, config.hidden_size, W1_ncol);
+    Vec<double> b1(0.0, config.hidden_size);
     int n_actions = (config.labeled) ? (known_labels.size() * 2 - 1) : 3;
     Mat<double> W2(0.0, n_actions, config.hidden_size);
 
@@ -411,12 +458,12 @@ void DependencyParser::setup_classifier_for_training(
 
     // Match the embedding vocabulary with words in dictionary
     int in_embed = 0;
-    for (int i = 0; i < E.nrows(); ++i)
+    for (int i = 0; i < Eb.nrows(); ++i)
     {
         if (config.delexicalized)
         {
-            for (int j = 0; j < E.ncols(); ++j)
-                E[i][j] = (Util::rand_double() * 2 - 1) * config.init_range;
+            for (int j = 0; j < Eb.ncols(); ++j)
+                Eb[i][j] = (Util::rand_double() * 2 - 1) * config.init_range;
             continue;
         }
 
@@ -442,15 +489,24 @@ void DependencyParser::setup_classifier_for_training(
         if (index >= 0)
         {
             ++ in_embed;
-            for (int j = 0; j < E.ncols(); ++j)
-                E[i][j] = embeddings[index][j];
+            for (int j = 0; j < Eb.ncols(); ++j)
+                Eb[i][j] = embeddings[index][j];
         }
         else
         {
-            for (int j = 0; j < E.ncols(); ++j)
-                E[i][j] = (Util::rand_double() * 2 - 1) * config.init_range;
+            for (int j = 0; j < Eb.ncols(); ++j)
+                Eb[i][j] = (Util::rand_double() * 2 - 1) * config.init_range;
         }
     }
+    for (int i = 0; i < Ed.nrows(); ++i)
+        for (int j = 0; j < Ed.ncols(); ++j)
+            Ed[i][j] = (Util::rand_double() * 2 - 1) * config.init_range;
+    for (int i = 0; i < Ev.nrows(); ++i)
+        for (int j = 0; j < Ev.ncols(); ++j)
+            Ev[i][j] = (Util::rand_double() * 2 - 1) * config.init_range;
+    for (int i = 0; i < Ec.nrows(); ++i)
+        for (int j = 0; j < Ec.ncols(); ++j)
+            Ec[i][j] = (Util::rand_double() * 2 - 1) * config.init_range;
 
     cerr << "Found embeddings: "
          << in_embed
@@ -475,7 +531,16 @@ void DependencyParser::setup_classifier_for_training(
      * setup the classifier
      */
     cerr << "create classifier" << endl;
-    classifier = new NNClassifier(config, dataset, E, W1, b1, W2, pre_computed_ids);
+    classifier = new NNClassifier(config,
+                                    dataset,
+                                    Eb,
+                                    Ed,
+                                    Ev,
+                                    Ec,
+                                    W1,
+                                    b1,
+                                    W2,
+                                    pre_computed_ids);
 }
 
 void DependencyParser::generate_ids()
@@ -491,6 +556,9 @@ void DependencyParser::generate_ids()
     for (size_t i = 0; i < known_poss.size();  ++i)
         pos_ids[known_poss[i]] = index++;
 
+    if (!config.use_postag)
+        index = 0;
+
     // if (config.labeled)
     for (size_t i = 0; i < known_labels.size(); ++i)
         label_ids[known_labels[i]] = index++;
@@ -502,6 +570,10 @@ void DependencyParser::generate_ids()
     if (config.use_valency)
         for (size_t i = 0; i < known_valencies.size(); ++i)
             valency_ids[known_valencies[i]] = index++;
+
+    if (config.use_cluster)
+        for (size_t i = 0; i < known_clusters.size(); ++i)
+            cluster_ids[known_clusters[i]] = index++;
 
     /* debug
     cerr << "word_ids" << endl;
@@ -716,7 +788,10 @@ void DependencyParser::save_model(const char * filename)
     Mat<double>& W1 = classifier->get_W1();
     Mat<double>& W2 = classifier->get_W2();
     Vec<double>& b1 = classifier->get_b1();
-    Mat<double>& E  = classifier->get_E();
+    Mat<double>& Eb = classifier->get_Eb();
+    Mat<double>& Ed = classifier->get_Ed();
+    Mat<double>& Ev = classifier->get_Ev();
+    Mat<double>& Ec = classifier->get_Ec();
 
     ofstream output(filename);
     output << "dict=" << known_words.size() << "\n"
@@ -724,9 +799,16 @@ void DependencyParser::save_model(const char * filename)
            << "label=" << known_labels.size() << "\n"
            << "dist=" << known_distances.size() << "\n"
            << "valency=" << known_valencies.size() << "\n"
-           << "embeddingsize=" << E.ncols() << "\n"
+           << "cluster=" << known_clusters.size() << "\n"
+           << "embeddingsize=" << Eb.ncols() << "\n"
+           << "distembeddingsize=" << Ed.ncols() << "\n"
+           << "valencyembeddingsize=" << Ev.ncols() << "\n"
+           << "clusterembeddingsize=" << Ec.ncols() << "\n"
            << "hiddensize=" << b1.size() << "\n"
-           << "numtokens=" << W1.ncols() / E.ncols() << "\n"
+           << "basictokens=" << config.num_basic_tokens << "\n"
+           << "disttokens="  << config.num_dist_tokens << "\n"
+           << "valencytokens=" << config.num_valency_tokens << "\n"
+           << "clustertokens=" << config.num_cluster_tokens << "\n"
            << "precomputed=" << pre_computed_ids.size() << "\n";
 
     int index = 0;
@@ -735,16 +817,16 @@ void DependencyParser::save_model(const char * filename)
         for (size_t i = 0; i < known_words.size(); ++i)
         {
             output << known_words[i];
-            for (int j = 0; j < E.ncols(); ++j)
-                output << " " << E[index][j];
+            for (int j = 0; j < Eb.ncols(); ++j)
+                output << " " << Eb[index][j];
             output << "\n";
             index += 1;
         }
     for (size_t i = 0; i < known_poss.size(); ++i)
     {
         output << known_poss[i];
-        for (int j = 0; j < E.ncols(); ++j)
-            output << " " << E[index][j];
+        for (int j = 0; j < Eb.ncols(); ++j)
+            output << " " << Eb[index][j];
         output << "\n";
         index += 1;
     }
@@ -752,26 +834,38 @@ void DependencyParser::save_model(const char * filename)
         for (size_t i = 0; i < known_labels.size(); ++i)
         {
             output << known_labels[i];
-            for (int j = 0; j < E.ncols(); ++j)
-                output << " " << E[index][j];
+            for (int j = 0; j < Eb.ncols(); ++j)
+                output << " " << Eb[index][j];
             output << "\n";
             index += 1;
         }
+    index = 0;
     if (config.use_distance)
         for (size_t i = 0; i < known_distances.size(); ++i)
         {
             output << known_distances[i];
-            for (int j = 0; j < E.ncols(); ++j)
-                output << " " << E[index][j];
+            for (int j = 0; j < Ed.ncols(); ++j)
+                output << " " << Ed[index][j];
             output << "\n";
             index += 1;
         }
+    index = 0;
     if (config.use_valency)
         for (size_t i = 0; i < known_valencies.size(); ++i)
         {
             output << known_valencies[i];
-            for (int j = 0; j < E.ncols(); ++j)
-                output << " " << E[index][j];
+            for (int j = 0; j < Ev.ncols(); ++j)
+                output << " " << Ev[index][j];
+            output << "\n";
+            index += 1;
+        }
+    index = 0;
+    if (config.use_cluster)
+        for (size_t i = 0; i < known_clusters.size(); ++i)
+        {
+            output << known_clusters[i];
+            for (int j = 0; j < Ec.ncols(); ++j)
+                output << " " << Ec[index][j];
             output << "\n";
             index += 1;
         }
@@ -815,12 +909,14 @@ vector<int> DependencyParser::get_features(Configuration& c)
     vector<int> f_word;
     vector<int> f_pos;
     vector<int> f_label;
+    vector<int> f_cluster;
 
     for (int i = 2; i >= 0; --i)
     {
         int index = c.get_stack(i);
         f_word.push_back(get_word_id(c.get_word(index)));
         f_pos.push_back(get_pos_id(c.get_pos(index)));
+        f_cluster.push_back(get_cluster_id(c.get_cluster(index)));
     }
 
     for (int i = 0; i <= 2; ++i)
@@ -828,6 +924,7 @@ vector<int> DependencyParser::get_features(Configuration& c)
         int index = c.get_buffer(i);
         f_word.push_back(get_word_id(c.get_word(index)));
         f_pos.push_back(get_pos_id(c.get_pos(index)));
+        f_cluster.push_back(get_cluster_id(c.get_cluster(index)));
     }
 
     for (int i = 0; i <= 1; ++i)
@@ -838,21 +935,25 @@ vector<int> DependencyParser::get_features(Configuration& c)
         f_word.push_back(get_word_id(c.get_word(index)));
         f_pos.push_back(get_pos_id(c.get_pos(index)));
         f_label.push_back(get_label_id(c.get_label(index)));
+        f_cluster.push_back(get_cluster_id(c.get_cluster(index)));
 
         index = c.get_right_child(k);
         f_word.push_back(get_word_id(c.get_word(index)));
         f_pos.push_back(get_pos_id(c.get_pos(index)));
         f_label.push_back(get_label_id(c.get_label(index)));
+        f_cluster.push_back(get_cluster_id(c.get_cluster(index)));
 
         index = c.get_left_child(k, 2);
         f_word.push_back(get_word_id(c.get_word(index)));
         f_pos.push_back(get_pos_id(c.get_pos(index)));
         f_label.push_back(get_label_id(c.get_label(index)));
+        f_cluster.push_back(get_cluster_id(c.get_cluster(index)));
 
         index = c.get_right_child(k, 2);
         f_word.push_back(get_word_id(c.get_word(index)));
         f_pos.push_back(get_pos_id(c.get_pos(index)));
         f_label.push_back(get_label_id(c.get_label(index)));
+        f_cluster.push_back(get_cluster_id(c.get_cluster(index)));
 
         index = c.get_left_child(c.get_left_child(k));
         f_word.push_back(get_word_id(c.get_word(index)));
@@ -863,7 +964,6 @@ vector<int> DependencyParser::get_features(Configuration& c)
         f_word.push_back(get_word_id(c.get_word(index)));
         f_pos.push_back(get_pos_id(c.get_pos(index)));
         f_label.push_back(get_label_id(c.get_label(index)));
-
     }
 
     vector<int> features;
@@ -891,6 +991,13 @@ vector<int> DependencyParser::get_features(Configuration& c)
         features.push_back(get_valency_id(c.get_rvalency(index)));
         index = c.get_stack(0);
         features.push_back(get_valency_id(c.get_lvalency(index)));
+    }
+
+    if (config.use_cluster)
+    {
+        features.insert(features.end(),
+                        f_cluster.begin(),
+                        f_cluster.end());
     }
 
     return features;
@@ -948,6 +1055,13 @@ int DependencyParser::get_valency_id(const string & v)
     return (valency_ids.find(v) == valency_ids.end())
                 ? valency_ids[Config::UNKNOWN]
                 : valency_ids[v];
+}
+
+int DependencyParser::get_cluster_id(const string & c)
+{
+    return (cluster_ids.find(c) == cluster_ids.end())
+                ? cluster_ids[Config::UNKNOWN]
+                : cluster_ids[c];
 }
 
 void DependencyParser::predict(
@@ -1019,11 +1133,16 @@ void DependencyParser::load_model(const char * filename)
     double start = get_time();
 
     ifstream input(filename);
-    int n_dict = 0, n_pos = 0, n_label = 0, n_dist = 0, n_valency = 0;
-    int E_size = 0, h_size = 0, n_tokens = 0, n_pre_computed = 0;
+    int n_dict = 0, n_pos = 0, n_label = 0;
+    int n_dist = 0, n_valency = 0, n_cluster = 0;
+    int Eb_size = 0, Ed_size = 0, Ev_size = 0, Ec_size = 0;
+    int h_size = 0;
+    int n_basic_tokens = 0, n_dist_tokens = 0;
+    int n_valency_tokens = 0, n_cluster_tokens = 0;
+    int n_pre_computed = 0;
 
     string s;
-    for (int k = 0; k < 9; ++k)
+    for (int k = 0; k < 16; ++k)
     {
         getline(input, s);
         vector<string> kv = split_by_sep(s, "=");
@@ -1046,15 +1165,35 @@ void DependencyParser::load_model(const char * filename)
                 n_valency = val;
                 break;
             case 5:
-                E_size = val;
-                break;
+                n_cluster = val;
             case 6:
-                h_size = val;
+                Eb_size = val;
                 break;
             case 7:
-                n_tokens = val;
+                Ed_size = val;
                 break;
             case 8:
+                Ev_size = val;
+                break;
+            case 9:
+                Ec_size = val;
+                break;
+            case 10:
+                h_size = val;
+                break;
+            case 11:
+                n_basic_tokens = val;
+                break;
+            case 12:
+                n_dist_tokens = val;
+                break;
+            case 13:
+                n_valency_tokens = val;
+                break;
+            case 14:
+                n_cluster_tokens = val;
+                break;
+            case 15:
                 n_pre_computed = val;
                 break;
             default:
@@ -1067,17 +1206,28 @@ void DependencyParser::load_model(const char * filename)
     known_labels.clear();
     known_distances.clear();
     known_valencies.clear();
+    known_clusters.clear();
 
     int index = 0;
-    int E_entries = n_pos + n_label;
-    if (!config.delexicalized)
-        E_entries += n_dict;
-    if (config.use_distance)
-        E_entries += n_dist;
-    if (config.use_valency)
-        E_entries += n_valency;
 
-    Mat<double> E(E_entries, E_size);
+    /*
+    if (config.use_postag)      Eb_entries += n_pos;
+    if (config.labeled)         Eb_entries += n_label;
+    if (!config.delexicalized)  Eb_entries += n_dict;
+    if (config.use_distance)    Ed_entries = n_dist;
+    if (config.use_valency)     Ev_entries = n_valency;
+    if (config.use_cluster)     Ec_entries = n_cluster;
+    */
+
+    int Eb_entries = n_dict + n_pos + n_label;
+    int Ed_entries = n_dist;
+    int Ev_entries = n_valency;
+    int Ec_entries = n_cluster;
+
+    Mat<double> Eb(Eb_entries, Eb_size);
+    Mat<double> Ed(Ed_entries, Ed_size);
+    Mat<double> Ev(Ev_entries, Ev_size);
+    Mat<double> Ec(Ec_entries, Ec_size);
 
     if (!config.delexicalized)
         for (int i = 0; i < n_dict; ++i)
@@ -1085,8 +1235,8 @@ void DependencyParser::load_model(const char * filename)
             getline(input, s);
             vector<string> sep = split(s);
             known_words.push_back(sep[0]);
-            for (int j = 0; j < E_size; ++j)
-                E[index][j] = to_double_sci(sep[j+1]);
+            for (int j = 0; j < Eb_size; ++j)
+                Eb[index][j] = to_double_sci(sep[j+1]);
             index += 1;
         }
 
@@ -1095,8 +1245,8 @@ void DependencyParser::load_model(const char * filename)
         getline(input, s);
         vector<string> sep = split(s);
         known_poss.push_back(sep[0]);
-        for (int j = 0; j < E_size; ++j)
-            E[index][j] = to_double_sci(sep[j+1]);
+        for (int j = 0; j < Eb_size; ++j)
+            Eb[index][j] = to_double_sci(sep[j+1]);
         index += 1;
     }
     if (config.labeled)
@@ -1105,38 +1255,59 @@ void DependencyParser::load_model(const char * filename)
             getline(input, s);
             vector<string> sep = split(s);
             known_labels.push_back(sep[0]);
-            for (int j = 0; j < E_size; ++j)
-                E[index][j] = to_double_sci(sep[j+1]);
+            for (int j = 0; j < Eb_size; ++j)
+                Eb[index][j] = to_double_sci(sep[j+1]);
             index += 1;
         }
     else
     {
-        known_labels.push_back(Config::UNKNOWN);
+        known_labels.push_back(Config::UNKNOWN); // confused =.=
     }
+
+    index = 0; // reset
     if (config.use_distance)
         for (int i = 0; i < n_dist; ++i)
         {
             getline(input, s);
             vector<string> sep = split(s);
             known_distances.push_back(to_int(sep[0]));
-            for (int j = 0; j < E_size; ++j)
-                E[index][j] = to_double_sci(sep[j+1]);
+            for (int j = 0; j < Ed_size; ++j)
+                Ed[index][j] = to_double_sci(sep[j+1]);
             index += 1;
         }
+
+    index = 0; // reset
     if (config.use_valency)
         for (int i = 0; i < n_valency; ++i)
         {
             getline(input, s);
             vector<string> sep = split(s);
             known_valencies.push_back(sep[0]);
-            for (int j = 0; j < E_size; ++j)
-                E[index][j] = to_double_sci(sep[j+1]);
+            for (int j = 0; j < Ev_size; ++j)
+                Ev[index][j] = to_double_sci(sep[j+1]);
+            index += 1;
+        }
+
+    index = 0; // reset
+    if (config.use_cluster)
+        for (int i = 0; i < n_cluster; ++i)
+        {
+            getline(input, s);
+            vector<string> sep = split(s);
+            known_clusters.push_back(sep[0]);
+            for (int j = 0; j < Ec_size; ++j)
+                Ec[index][j] = to_double_sci(sep[j+1]);
             index += 1;
         }
 
     generate_ids();
 
-    Mat<double> W1(h_size, n_tokens * E_size);
+    int W1_ncol = Eb_size * n_basic_tokens
+                + Ed_size * n_dist_tokens
+                + Ev_size * n_valency_tokens
+                + Ec_size * n_nluster_tokens;
+
+    Mat<double> W1(h_size, W1_ncol);
     for (int j = 0; j < W1.ncols(); ++j)
     {
         getline(input, s);
@@ -1173,11 +1344,11 @@ void DependencyParser::load_model(const char * filename)
     }
 
     input.close();
-    classifier = new NNClassifier(config, E, W1, b1, W2, pre_computed_ids);
+    classifier = new NNClassifier(config, Eb, Ed, Ev, Ec, W1, b1, W2, pre_computed_ids);
     vector<string> ldict = known_labels;
     if (config.labeled)
         ldict.pop_back(); // remove the NIL label
-    system = new ArcStandard(ldict, config.labeled);
+    system = new ArcStandard(ldict, config.labeled); // know why I feel confused before?
 
     if (config.num_pre_computed > 0)
         classifier->pre_compute();
@@ -1206,11 +1377,16 @@ void DependencyParser::load_model_cl(
     double start = get_time();
 
     ifstream input(filename);
-    int n_dict = 0, n_pos = 0, n_label = 0, n_dist = 0, n_valency = 0;
-    int E_size = 0, h_size = 0, n_tokens = 0, n_pre_computed = 0;
+    int n_dict = 0, n_pos = 0, n_label = 0;
+    int n_dist = 0, n_valency = 0, n_cluster = 0;
+    int Eb_size = 0, Ed_size = 0, Ev_size = 0, Ec_size = 0;
+    int h_size = 0;
+    int n_basic_tokens = 0, n_dist_tokens = 0;
+    int n_valency_tokens = 0, n_cluster_tokens = 0;
+    int n_pre_computed = 0;
 
     string s;
-    for (int k = 0; k < 9; ++k)
+    for (int k = 0; k < 16; ++k)
     {
         getline(input, s);
         vector<string> kv = split_by_sep(s, "=");
@@ -1233,15 +1409,35 @@ void DependencyParser::load_model_cl(
                 n_valency = val;
                 break;
             case 5:
-                E_size = val;
-                break;
+                n_cluster = val;
             case 6:
-                h_size = val;
+                Eb_size = val;
                 break;
             case 7:
-                n_tokens = val;
+                Ed_size = val;
                 break;
             case 8:
+                Ev_size = val;
+                break;
+            case 9:
+                Ec_size = val;
+                break;
+            case 10:
+                h_size = val;
+                break;
+            case 11:
+                n_basic_tokens = val;
+                break;
+            case 12:
+                n_dist_tokens = val;
+                break;
+            case 13:
+                n_valency_tokens = val;
+                break;
+            case 14:
+                n_cluster_tokens = val;
+                break;
+            case 15:
                 n_pre_computed = val;
                 break;
             default:
@@ -1249,31 +1445,41 @@ void DependencyParser::load_model_cl(
         }
     }
 
+    // verification
+    if (n_dist_tokens == 0) assert (n_dist == 0);
+    if (n_valency_tokens == 0) assert (n_valency == 0);
+    if (n_cluster_tokens == 0) assert (n_cluster == 0);
+
     known_words.clear();
     known_poss.clear();
     known_labels.clear();
     known_distances.clear();
     known_valencies.clear();
+    known_clusters.clear();
 
     read_embed_file(clemb);
     int n_cldict = embeddings.nrows(); // vocab size of target language
 
     int index = 0;
-    int E_entries = n_cldict + 3 + n_pos + n_label; // 3 -> -UNKNOWN-, -NULL-, -ROOT-
-    if (config.use_distance)
-        E_entries += n_dist;
-    if (config.use_valency)
-        E_entries += n_valency;
 
-    Mat<double> E(E_entries, E_size);
+    int Eb_entries = n_cldict + 3 + n_pos + n_label; // 3 -> -UNKNOWN-, -NULL-, -ROOT-
+    int Ed_entries = n_dist;
+    int Ev_entries = n_valency;
+    int Ec_entries = n_cluster;
+
+    Mat<double> Eb(Eb_entries, Eb_size);
+    Mat<double> Ed(Ed_entries, Ed_size);
+    Mat<double> Ev(Ev_entries, Ev_size);
+    Mat<double> Ec(Ec_entries, Ec_size);
+
     unordered_map<string, int>::iterator iter = embed_ids.begin();
     for (; iter != embed_ids.end(); ++iter)
     {
         string word = iter->first;
         known_words.push_back(word);
 
-        for (int j = 0; j < E_size; ++j)
-            E[index][j] = embeddings[iter->second][j];
+        for (int j = 0; j < Eb_size; ++j)
+            Eb[index][j] = embeddings[iter->second][j];
         index += 1;
     }
 
@@ -1291,8 +1497,8 @@ void DependencyParser::load_model_cl(
                 || sep[0] == Config::NIL)
         {
             known_words.push_back(sep[0]);
-            for (int j = 0; j < E_size; ++j)
-                E[index][j] = to_double_sci(sep[j+1]);
+            for (int j = 0; j < Eb_size; ++j)
+                Eb[index][j] = to_double_sci(sep[j+1]);
             index += 1;
         }
         // else: skip all words in source language
@@ -1305,48 +1511,69 @@ void DependencyParser::load_model_cl(
         getline(input, s);
         vector<string> sep = split(s);
         known_poss.push_back(sep[0]);
-        for (int j = 0; j < E_size; ++j)
-            E[index][j] = to_double_sci(sep[j+1]);
+        for (int j = 0; j < Eb_size; ++j)
+            Eb[index][j] = to_double_sci(sep[j+1]);
         index += 1;
     }
-    if (config.labeled)
+    if (config.labeled) // always true
         for (int i = 0; i < n_label; ++i)
         {
             getline(input, s);
             vector<string> sep = split(s);
             known_labels.push_back(sep[0]);
-            for (int j = 0; j < E_size; ++j)
-                E[index][j] = to_double_sci(sep[j+1]);
+            for (int j = 0; j < Eb_size; ++j)
+                Eb[index][j] = to_double_sci(sep[j+1]);
             index += 1;
         }
-    else
+    else // always false
     {
         known_labels.push_back(Config::UNKNOWN);
     }
-    if (config.use_distance)
+
+    index = 0; // reset
+    if (config.use_distance)  // or (n_dist_tokens > 0)
         for (int i = 0; i < n_dist; ++i)
         {
             getline(input, s);
             vector<string> sep = split(s);
             known_distances.push_back(to_int(sep[0]));
-            for (int j = 0; j < E_size; ++j)
-                E[index][j] = to_double_sci(sep[j+1]);
+            for (int j = 0; j < Ed_size; ++j)
+                Ed[index][j] = to_double_sci(sep[j+1]);
             index += 1;
         }
-    if (config.use_valency)
+
+    index = 0; // reset
+    if (config.use_valency)  // or (n_valency_tokens > 0)
         for (int i = 0; i < n_valency; ++i)
         {
             getline(input, s);
             vector<string> sep = split(s);
             known_valencies.push_back(sep[0]);
-            for (int j = 0; j < E_size; ++j)
-                E[index][j] = to_double_sci(sep[j+1]);
+            for (int j = 0; j < Ev_size; ++j)
+                Ev[index][j] = to_double_sci(sep[j+1]);
+            index += 1;
+        }
+
+    index = 0; // reset
+    if (config.use_cluster)  // or (n_cluster_tokens > 0)
+        for (int i = 0; i < n_cluster; ++i)
+        {
+            getline(input, s);
+            vector<string> sep = split(s);
+            known_clusters.push_back(sep[0]);
+            for (int j = 0; j < Ec_size; ++j)
+                Ec[index][j] = to_double_sci(sep[j+1]);
             index += 1;
         }
 
     generate_ids();
 
-    Mat<double> W1(h_size, n_tokens * E_size);
+    int W1_ncol = Eb_size * n_basic_tokens
+                + Ed_size * n_dist_tokens
+                + Ev_size * n_valency_tokens
+                + Ec_size * n_cluster_tokens;
+
+    Mat<double> W1(h_size, W1_ncol);
     for (int j = 0; j < W1.ncols(); ++j)
     {
         getline(input, s);
@@ -1383,7 +1610,7 @@ void DependencyParser::load_model_cl(
     }
 
     input.close();
-    classifier = new NNClassifier(config, E, W1, b1, W2, vector<int>());
+    classifier = new NNClassifier(config, Eb, Ed, Ev, Ec, W1, b1, W2, vector<int>());
     vector<string> ldict = known_labels;
     if (config.labeled)
         ldict.pop_back(); // remove the NIL label

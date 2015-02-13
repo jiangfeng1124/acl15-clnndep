@@ -11,6 +11,11 @@ class Config
         const static std::string ROOT;
         const static int UNKNOWN_INT;
 
+        const static int BASIC_FEAT;
+        const static int DIST_FEAT;
+        const static int VALENCY_FEAT;
+        const static int CLUSTER_FEAT;
+
         /**
          * for printing message
          */
@@ -46,9 +51,15 @@ class Config
          * number of tokens as input to the neural net
          */
         int num_tokens;
-        // int num_dict_tokens; // 18
-        // int num_pos_tokens;  // 18
-        // int num_label_tokens;// 12
+
+        int num_basic_tokens;
+        int num_word_tokens; // 18
+        int num_pos_tokens;  // 18
+        int num_label_tokens;// 12
+
+        int num_dist_tokens; // 1
+        int num_valency_tokens; // 3
+        int num_cluster_tokens; // 14
 
         int num_pre_computed;
 
@@ -99,6 +110,11 @@ class Config
         bool use_cluster;
         int cluster_embedding_size;
 
+        /**
+         * whether use postag feature
+         */
+        bool use_postag;
+
     public:
         Config();
         Config(const char * filename);
@@ -108,6 +124,10 @@ class Config
         void init();
         void set_properties(const char * filename);
         void print_info();
+
+        int get_embedding_size(int i);
+        int get_feat_type(int i);
+        int get_offset(int pos);
 
     private:
         void cfg_set_int(

@@ -24,7 +24,7 @@ Sample::~Sample()
 
 Dataset::~Dataset()
 {
-    // samples.clear();
+    samples.clear();
 }
 
 void Dataset::add_sample(vector<int> & feature, vector<int> & label)

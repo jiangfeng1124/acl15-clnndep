@@ -11,7 +11,7 @@ class DependencySent
         DependencySent(const DependencySent& s);
         ~DependencySent() {}
 
-        void add(std::string& word, std::string& pos);
+        void add(std::string& word, std::string& pos, std::string& cluster);
 
         void init();
 
@@ -21,6 +21,7 @@ class DependencySent
         int n;
         std::vector<std::string> words;
         std::vector<std::string> poss;
+        std::vector<std::string> clusters;
         // std::vector<std::string> pposs; #TODO
 };
 

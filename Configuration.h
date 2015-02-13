@@ -54,6 +54,8 @@ class Configuration
 
         std::string get_pos(int k);
 
+        std::string get_cluster(int k);
+
         void add_arc(int h, int m, const std::string & l);
 
         int get_left_child(int k, int cnt);

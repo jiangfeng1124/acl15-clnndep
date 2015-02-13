@@ -174,6 +174,18 @@ string Configuration::get_pos(int k)
                 : sent.poss[k];
 }
 
+string Configuration::get_cluster(int k)
+{
+    if (k == 0)
+        return Config::ROOT;
+    else
+        -- k;
+
+    return (k < 0 || k >= sent.n)
+                ? Config::NIL
+                : sent.clusters[k];
+}
+
 void Configuration::add_arc(int h, int m, const string & l)
 {
     tree.set(m, h, l);
