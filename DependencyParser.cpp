@@ -105,15 +105,17 @@ void DependencyParser::train(
     /**
      * Gradient Check
      */
-    classifier->check_gradient();
     // classifier->check_gradient();
-    return ;
+    // classifier->check_gradient();
 
     /**
      * train classifier by calling classifier.train
      */
 
     save_model(string(model_file)); // can rename
+
+    // return ;
+
     double best_uas = -DBL_MAX;
     for (int iter = 0; iter < config.max_iter; ++iter)
     {
@@ -556,9 +558,6 @@ void DependencyParser::generate_ids()
     for (size_t i = 0; i < known_poss.size();  ++i)
         pos_ids[known_poss[i]] = index++;
 
-    if (!config.use_postag)
-        index = 0;
-
     // if (config.labeled)
     for (size_t i = 0; i < known_labels.size(); ++i)
         label_ids[known_labels[i]] = index++;
@@ -1000,6 +999,8 @@ vector<int> DependencyParser::get_features(Configuration& c)
                         f_cluster.end());
     }
 
+    assert ((int)features.size() == config.num_tokens);
+
     return features;
 }
 
@@ -1305,7 +1306,7 @@ void DependencyParser::load_model(const char * filename)
     int W1_ncol = Eb_size * n_basic_tokens
                 + Ed_size * n_dist_tokens
                 + Ev_size * n_valency_tokens
-                + Ec_size * n_nluster_tokens;
+                + Ec_size * n_cluster_tokens;
 
     Mat<double> W1(h_size, W1_ncol);
     for (int j = 0; j < W1.ncols(); ++j)

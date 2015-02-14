@@ -79,6 +79,7 @@ class Cost
         {
             loss = _loss;
             percent_correct = _percent_correct;
+
             grad_W1 = _grad_W1;
             grad_b1 = _grad_b1;
             grad_W2 = _grad_W2;
@@ -86,6 +87,7 @@ class Cost
             grad_Ed = _grad_Ed;
             grad_Ev = _grad_Ev;
             grad_Ec = _grad_Ec;
+
             dropout_histories = _dropout_histories;
         }
 
@@ -225,6 +227,8 @@ class NNClassifier
         Mat<double>& get_Ed();
         Mat<double>& get_Ev();
         Mat<double>& get_Ec();
+
+        void print_info();
 
     private:
         /**

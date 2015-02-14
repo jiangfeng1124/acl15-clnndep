@@ -156,7 +156,7 @@ void Config::set_properties(const char * filename)
     if (!use_valency)  num_valency_tokens = 0;
     if (!use_cluster)  num_cluster_tokens = 0;
 
-    assert (num_tokens = num_basic_tokens
+    assert (num_tokens == num_basic_tokens
                             + num_dist_tokens
                             + num_valency_tokens
                             + num_cluster_tokens);
@@ -256,6 +256,7 @@ int Config::get_embedding_size(int feat_type)
             return cluster_embedding_size;
             break;
         default:
+            cerr << "Weird!" << endl;
             return embedding_size;
             break;
     }
@@ -281,7 +282,7 @@ int Config::get_offset(int pos)
         offset = num_basic_tokens * embedding_size
             + num_dist_tokens * distance_embedding_size
             + num_valency_tokens * valency_embedding_size
-            + (pos - num_valency_tokens - num_dist_tokens - num_valency_tokens) * cluster_embedding_size;
+            + (pos - num_basic_tokens - num_dist_tokens - num_valency_tokens) * cluster_embedding_size;
 
     return offset;
 }
