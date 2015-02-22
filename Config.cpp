@@ -55,7 +55,7 @@ void Config::init()
 
     num_dist_tokens         = 1;
     num_valency_tokens      = 3;
-    num_cluster_tokens      = 14;
+    num_cluster_tokens      = 18;
 
     num_pre_computed        = 100000;
     eval_per_iter           = 100;
@@ -120,8 +120,8 @@ void Config::set_properties(const char * filename)
     cfg_set_int(props, "num_label_tokens",          num_label_tokens);
     cfg_set_int(props, "num_dist_tokens",           num_dist_tokens);
     cfg_set_int(props, "num_valency_tokens",        num_valency_tokens);
-    cfg_set_int(props, "num_cluster_tokens",        num_cluster_tokens);
     */
+    cfg_set_int(props, "num_cluster_tokens",        num_cluster_tokens);
 
     cfg_set_int(props, "num_pre_computed",          num_pre_computed);
     cfg_set_int(props, "eval_per_iter",             eval_per_iter);
@@ -144,7 +144,7 @@ void Config::set_properties(const char * filename)
     cfg_set_boolean(props, "use_distance",          use_distance);
     cfg_set_boolean(props, "use_valency",           use_valency);
     cfg_set_boolean(props, "use_cluster",           use_cluster);
-    cfg_set_boolean(props, "use_postag",            use_postag);
+    // cfg_set_boolean(props, "use_postag",            use_postag);
 
     if (delexicalized) num_word_tokens = 0;
     if (!labeled) num_label_tokens = 0;

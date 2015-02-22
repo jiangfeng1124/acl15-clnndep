@@ -522,6 +522,30 @@ inline std::string str_toupper(std::string& str)
     return uc_str;
 }
 
+// retrieve prefix of brown clusters
+inline std::string get_brown_prefix(
+        std::string & str,
+        int p)
+{
+    if (str == "-UNKNOWN-") // predefined
+        return str;
+        // return "p" + to_str(p) + str;
+
+    std::string norm_str = str + "0000000000";
+    return "p" + to_str(p) + norm_str.substr(0, p);
+}
+
+
+inline void get_prefix(
+        std::vector<std::string> & strs,
+        std::vector<std::string> & strsp,
+        int p)
+{
+    strsp.clear();
+    for (size_t i = 0; i < strs.size(); ++i)
+        strsp.push_back(get_brown_prefix(strs[i], p));
+}
+
 /**
  *
  *

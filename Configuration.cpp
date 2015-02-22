@@ -186,6 +186,21 @@ string Configuration::get_cluster(int k)
                 : sent.clusters[k];
 }
 
+string Configuration::get_cluster_prefix(int k, int p)
+{
+    if (k == 0)
+        return Config::ROOT;
+    else
+        -- k;
+
+    return (k < 0 || k > sent.n)
+                ? Config::NIL
+                : get_brown_prefix(sent.clusters[k], p);
+                // : ((sent.clusters[k] == Config::UNKNOWN)
+                //         ? Config::UNKNOWN
+                //         : get_brown_prefix(sent.clusters[k], p));
+}
+
 void Configuration::add_arc(int h, int m, const string & l)
 {
     tree.set(m, h, l);

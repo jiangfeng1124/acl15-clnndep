@@ -161,10 +161,14 @@ void DependencyParser::train(
             cerr << "UEM(dev) = " << uem << "%" << endl;
             cerr << "ROOT(dev) = " << root << "%" << endl;
 
+            if (iter % (10 * config.eval_per_iter) == 0)
+                save_model(string(model_file) + "." + to_str(iter));
+
             if (config.save_intermediate && uas > best_uas)
             {
                 best_uas = uas;
                 // save_model(string(model_file) + "." + to_str(iter)); // can rename
+
                 save_model(string(model_file)); // can rename
             }
         }
@@ -247,10 +251,26 @@ void DependencyParser::gen_dictionaries(
                 sents[i].poss.end());
 
         if (config.use_cluster)
+        {
             all_clusters.insert(
                     all_clusters.end(),
                     sents[i].clusters.begin(),
                     sents[i].clusters.end());
+
+            vector<string> cluster_p4;
+            get_prefix(sents[i].clusters, cluster_p4, 4);
+            vector<string> cluster_p6;
+            get_prefix(sents[i].clusters, cluster_p6, 6);
+
+            all_clusters.insert(
+                    all_clusters.end(),
+                    cluster_p4.begin(),
+                    cluster_p4.end());
+            all_clusters.insert(
+                    all_clusters.end(),
+                    cluster_p6.begin(),
+                    cluster_p6.end());
+        }
     }
 
     string root_label = "";
@@ -821,14 +841,15 @@ void DependencyParser::save_model(const char * filename)
             output << "\n";
             index += 1;
         }
-    for (size_t i = 0; i < known_poss.size(); ++i)
-    {
-        output << known_poss[i];
-        for (int j = 0; j < Eb.ncols(); ++j)
-            output << " " << Eb[index][j];
-        output << "\n";
-        index += 1;
-    }
+    if (!config.use_postag)
+        for (size_t i = 0; i < known_poss.size(); ++i)
+        {
+            output << known_poss[i];
+            for (int j = 0; j < Eb.ncols(); ++j)
+                output << " " << Eb[index][j];
+            output << "\n";
+            index += 1;
+        }
     if (config.labeled)
         for (size_t i = 0; i < known_labels.size(); ++i)
         {
@@ -916,6 +937,15 @@ vector<int> DependencyParser::get_features(Configuration& c)
         f_word.push_back(get_word_id(c.get_word(index)));
         f_pos.push_back(get_pos_id(c.get_pos(index)));
         f_cluster.push_back(get_cluster_id(c.get_cluster(index)));
+
+        // use prefix feature of brown cluster
+        // /*
+        if (i == 0)
+        {
+            f_cluster.push_back(get_cluster_id(c.get_cluster_prefix(index, 4)));
+            f_cluster.push_back(get_cluster_id(c.get_cluster_prefix(index, 6)));
+        }
+        // */
     }
 
     for (int i = 0; i <= 2; ++i)
@@ -924,6 +954,15 @@ vector<int> DependencyParser::get_features(Configuration& c)
         f_word.push_back(get_word_id(c.get_word(index)));
         f_pos.push_back(get_pos_id(c.get_pos(index)));
         f_cluster.push_back(get_cluster_id(c.get_cluster(index)));
+
+        // use prefix feature of brown cluster
+        // /*
+        if (i == 0)
+        {
+            f_cluster.push_back(get_cluster_id(c.get_cluster_prefix(index, 4)));
+            f_cluster.push_back(get_cluster_id(c.get_cluster_prefix(index, 6)));
+        }
+        // */
     }
 
     for (int i = 0; i <= 1; ++i)
@@ -958,11 +997,13 @@ vector<int> DependencyParser::get_features(Configuration& c)
         f_word.push_back(get_word_id(c.get_word(index)));
         f_pos.push_back(get_pos_id(c.get_pos(index)));
         f_label.push_back(get_label_id(c.get_label(index)));
+        f_cluster.push_back(get_cluster_id(c.get_cluster(index)));
 
         index = c.get_right_child(c.get_right_child(k));
         f_word.push_back(get_word_id(c.get_word(index)));
         f_pos.push_back(get_pos_id(c.get_pos(index)));
         f_label.push_back(get_label_id(c.get_label(index)));
+        f_cluster.push_back(get_cluster_id(c.get_cluster(index)));
     }
 
     vector<int> features;
@@ -971,9 +1012,10 @@ vector<int> DependencyParser::get_features(Configuration& c)
                         f_word.begin(),
                         f_word.end());
 
-    features.insert(features.end(),
-                    f_pos.begin(),
-                    f_pos.end());
+    if (config.use_postag)
+        features.insert(features.end(),
+                        f_pos.begin(),
+                        f_pos.end());
 
     if (config.labeled)
         features.insert(features.end(),
@@ -1220,7 +1262,10 @@ void DependencyParser::load_model(const char * filename)
     if (config.use_cluster)     Ec_entries = n_cluster;
     */
 
-    int Eb_entries = n_dict + n_pos + n_label;
+    int Eb_entries = n_label;
+    if (!config.delexicalized) Eb_entries += n_dict;
+    if (config.use_postag)     Eb_entries += n_pos;
+
     int Ed_entries = n_dist;
     int Ev_entries = n_valency;
     int Ec_entries = n_cluster;
@@ -1241,15 +1286,17 @@ void DependencyParser::load_model(const char * filename)
             index += 1;
         }
 
-    for (int i = 0; i < n_pos; ++i)
-    {
-        getline(input, s);
-        vector<string> sep = split(s);
-        known_poss.push_back(sep[0]);
-        for (int j = 0; j < Eb_size; ++j)
-            Eb[index][j] = to_double_sci(sep[j+1]);
-        index += 1;
-    }
+    if (config.use_postag)
+        for (int i = 0; i < n_pos; ++i)
+        {
+            getline(input, s);
+            vector<string> sep = split(s);
+            known_poss.push_back(sep[0]);
+            for (int j = 0; j < Eb_size; ++j)
+                Eb[index][j] = to_double_sci(sep[j+1]);
+            index += 1;
+        }
+
     if (config.labeled)
         for (int i = 0; i < n_label; ++i)
         {
@@ -1463,7 +1510,8 @@ void DependencyParser::load_model_cl(
 
     int index = 0;
 
-    int Eb_entries = n_cldict + 3 + n_pos + n_label; // 3 -> -UNKNOWN-, -NULL-, -ROOT-
+    int Eb_entries = n_cldict + 3 + n_label; // 3 -> -UNKNOWN-, -NULL-, -ROOT-
+    if (config.use_postag) Eb_entries += n_pos;
     int Ed_entries = n_dist;
     int Ev_entries = n_valency;
     int Ec_entries = n_cluster;
@@ -1507,15 +1555,16 @@ void DependencyParser::load_model_cl(
 
     assert (index == n_cldict + 3); // debug
 
-    for (int i = 0; i < n_pos; ++i)
-    {
-        getline(input, s);
-        vector<string> sep = split(s);
-        known_poss.push_back(sep[0]);
-        for (int j = 0; j < Eb_size; ++j)
-            Eb[index][j] = to_double_sci(sep[j+1]);
-        index += 1;
-    }
+    if (config.use_postag)
+        for (int i = 0; i < n_pos; ++i)
+        {
+            getline(input, s);
+            vector<string> sep = split(s);
+            known_poss.push_back(sep[0]);
+            for (int j = 0; j < Eb_size; ++j)
+                Eb[index][j] = to_double_sci(sep[j+1]);
+            index += 1;
+        }
     if (config.labeled) // always true
         for (int i = 0; i < n_label; ++i)
         {
