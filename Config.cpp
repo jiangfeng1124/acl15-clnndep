@@ -234,6 +234,7 @@ void Config::print_info()
     cerr << "use_distance            = " << use_distance            << endl;
     cerr << "use_valency             = " << use_valency             << endl;
     cerr << "use_cluster             = " << use_cluster             << endl;
+    cerr << "use_postag              = " << use_postag              << endl;
     cerr << "distance_embedding_size = " << distance_embedding_size << endl;
     cerr << "valency_embedding_size  = " << valency_embedding_size  << endl;
     cerr << "cluster_embedding_size  = " << cluster_embedding_size  << endl;

@@ -576,7 +576,12 @@ void DependencyParser::generate_ids()
         index = 0;
 
     for (size_t i = 0; i < known_poss.size();  ++i)
-        pos_ids[known_poss[i]] = index++;
+    {
+        if (!config.use_postag)
+            pos_ids[known_poss[i]] = 0;
+        else
+            pos_ids[known_poss[i]] = index++;
+    }
 
     // if (config.labeled)
     for (size_t i = 0; i < known_labels.size(); ++i)
@@ -841,7 +846,7 @@ void DependencyParser::save_model(const char * filename)
             output << "\n";
             index += 1;
         }
-    if (!config.use_postag)
+    if (config.use_postag)
         for (size_t i = 0; i < known_poss.size(); ++i)
         {
             output << known_poss[i];
@@ -940,7 +945,7 @@ vector<int> DependencyParser::get_features(Configuration& c)
 
         // use prefix feature of brown cluster
         // /*
-        if (i == 0)
+        if (i == 0 || i == 1)
         {
             f_cluster.push_back(get_cluster_id(c.get_cluster_prefix(index, 4)));
             f_cluster.push_back(get_cluster_id(c.get_cluster_prefix(index, 6)));
@@ -956,13 +961,13 @@ vector<int> DependencyParser::get_features(Configuration& c)
         f_cluster.push_back(get_cluster_id(c.get_cluster(index)));
 
         // use prefix feature of brown cluster
-        // /*
+        /*
         if (i == 0)
         {
             f_cluster.push_back(get_cluster_id(c.get_cluster_prefix(index, 4)));
             f_cluster.push_back(get_cluster_id(c.get_cluster_prefix(index, 6)));
         }
-        // */
+        */
     }
 
     for (int i = 0; i <= 1; ++i)
