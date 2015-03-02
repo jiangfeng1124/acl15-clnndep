@@ -945,7 +945,7 @@ vector<int> DependencyParser::get_features(Configuration& c)
 
         // use prefix feature of brown cluster
         // /*
-        if (i == 0 || i == 1)
+        if (i == 0)
         {
             f_cluster.push_back(get_cluster_id(c.get_cluster_prefix(index, 4)));
             f_cluster.push_back(get_cluster_id(c.get_cluster_prefix(index, 6)));
@@ -961,13 +961,13 @@ vector<int> DependencyParser::get_features(Configuration& c)
         f_cluster.push_back(get_cluster_id(c.get_cluster(index)));
 
         // use prefix feature of brown cluster
-        /*
+        // /*
         if (i == 0)
         {
             f_cluster.push_back(get_cluster_id(c.get_cluster_prefix(index, 4)));
             f_cluster.push_back(get_cluster_id(c.get_cluster_prefix(index, 6)));
         }
-        */
+        // */
     }
 
     for (int i = 0; i <= 1; ++i)
@@ -1616,8 +1616,14 @@ void DependencyParser::load_model_cl(
             getline(input, s);
             vector<string> sep = split(s);
             known_clusters.push_back(sep[0]);
-            for (int j = 0; j < Ec_size; ++j)
-                Ec[index][j] = to_double_sci(sep[j+1]);
+            /*
+            if (sep[0] == Config::UNKNOWN)
+                for (int j = 0; j < Ec_size; ++j)
+                    Ec[index][j] = 0.0;
+            else
+            */
+                for (int j = 0; j < Ec_size; ++j)
+                    Ec[index][j] = to_double_sci(sep[j+1]);
             index += 1;
         }
 
