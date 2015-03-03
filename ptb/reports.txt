@@ -1,0 +1,62 @@
+Reports:
+
+1. Monolingual on PTB
+
+1.0. Pre-trained using senna
+    # tuning cluster embedding size
+---------------------------------------------
+              |     Dev             Test
+    System    | -----------------------------
+              | UAS     LAS     UAS     LAS
+---------------------------------------------
+Basic         | 92.2    91.0    91.9    90.6
+Basic+d/v     | 92.1    90.9    92.0    90.8
+---------------------------------------------
+Basic+d/v/c8  | 92.3    91.1    92.2    90.9
+Basic+d/v/c16 | 92.3    91.0    92.3    91.0
+Basic+d/v/c32 | 92.2    91.1    92.2    90.9
+Basic+d/v/c64 | 92.5    91.3    92.4    91.1
+---------------------------------------------
+
+1.1. Varying the word embedding size: 100 (wmt11)
+    # set cluster number to 256
+---------------------------------------------
+              |     Dev             Test
+    System    | -----------------------------
+              | UAS     LAS     UAS     LAS
+---------------------------------------------
+Basic         | running
+Basic+d/v     | running
+Basic+c64     | running
+---------------------------------------------
+Basic+d/v/c64 | running
+---------------------------------------------
+
+1.2. Varying the number of clusters: 512, 1024
+
+# word embedding size = 50 (senna) : --
+-------------------------------------------------
+                   |    Dev             Test
+    System         | ----------------------------
+                   | UAS     LAS     UAS     LAS
+-------------------------------------------------
+Basic+c64(256)     | running
+Basic+c64(512)     | running
+Basic+c64(1024)    | running
+Basic+d/v/c64(512) | running
+Basic+d/v/c64(1024)| running
+-------------------------------------------------
+
+# word embedding size = 100 (wmt11)
+-------------------------------------------------
+                   |    Dev             Test
+    System         | ----------------------------
+                   | UAS     LAS     UAS     LAS
+-------------------------------------------------
+Basic+c64(512)     | running
+Basic+c64(1024)    | running
+Basic+d/v/c64-512  | running
+Basic+d/v/c64-1024 | running
+-------------------------------------------------
+
+
