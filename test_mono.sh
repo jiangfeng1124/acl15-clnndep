@@ -2,8 +2,8 @@
 
 corpus=ptb/
 
-f_test=$corpus/dev.dep
-f_model=$corpus/model.senna.d100.h400
+f_test=$corpus/test.dep
+f_model=$corpus/model.senna.d50.h400/model
 
 f_conf=conf/nndep_mono.cfg
 
