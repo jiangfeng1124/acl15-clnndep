@@ -149,7 +149,8 @@ int main(int argc, char** argv)
     parse_command_line(argc, argv);
     cerr << opt.cfg_file << endl;
 
-    srand(time(NULL));
+    // srand(time(NULL));
+    srand(12345);
 
     DependencyParser parser(opt.cfg_file);
 

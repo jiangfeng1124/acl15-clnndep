@@ -11,6 +11,8 @@
 #include "Util.h"
 #include "Config.h"
 #include "time.h"
+
+#include <omp.h>
 // #include "../utils/io.h"
 // #include "../utils/logging.h"
 
@@ -56,6 +58,11 @@ void DependencyParser::train(
         const char * model_file,
         const char * embed_file)
 {
+    // omp_set_num_threads(30);
+    int n_threads = omp_get_max_threads();
+    if (n_threads > 1)
+        cerr << "Using " << n_threads << " threads" << endl;
+
     cerr << "Train file:     " << train_file << endl;
     cerr << "Dev file:       " << dev_file   << endl;
     cerr << "Model file:     " << model_file << endl;
@@ -466,20 +473,24 @@ void DependencyParser::setup_classifier_for_training(
 
     // Randomly initialize weight matrices / vectors
     double W1_init_range = sqrt(6.0 / (W1.nrows() + W1.ncols()));
+    #pragma omp parallel for
     for (int i = 0; i < W1.nrows(); ++i)
         for (int j = 0; j < W1.ncols(); ++j)
             W1[i][j] = (Util::rand_double() * 2 - 1) * W1_init_range;
 
+    #pragma omp parallel for
     for (int i = 0; i < b1.size(); ++i)
         b1[i] = (Util::rand_double() * 2 - 1) * W1_init_range;
 
     double W2_init_range = sqrt(6.0 / (W2.nrows() + W2.ncols()));
+    #pragma omp parallel for
     for (int i = 0; i < W2.nrows(); ++i)
         for (int j = 0; j < W2.ncols(); ++j)
             W2[i][j] = (Util::rand_double() * 2 - 1) * W2_init_range;
 
     // Match the embedding vocabulary with words in dictionary
     int in_embed = 0;
+    #pragma omp parallel for
     for (int i = 0; i < Eb.nrows(); ++i)
     {
         if (config.delexicalized)
@@ -520,12 +531,15 @@ void DependencyParser::setup_classifier_for_training(
                 Eb[i][j] = (Util::rand_double() * 2 - 1) * config.init_range;
         }
     }
+    #pragma omp parallel for
     for (int i = 0; i < Ed.nrows(); ++i)
         for (int j = 0; j < Ed.ncols(); ++j)
             Ed[i][j] = (Util::rand_double() * 2 - 1) * config.init_range;
+    #pragma omp parallel for
     for (int i = 0; i < Ev.nrows(); ++i)
         for (int j = 0; j < Ev.ncols(); ++j)
             Ev[i][j] = (Util::rand_double() * 2 - 1) * config.init_range;
+    #pragma omp parallel for
     for (int i = 0; i < Ec.nrows(); ++i)
         for (int j = 0; j < Ec.ncols(); ++j)
             Ec[i][j] = (Util::rand_double() * 2 - 1) * config.init_range;
@@ -1164,9 +1178,10 @@ void DependencyParser::predict(
     // vector<DependencyTree> result;
     trees.clear();
     trees.resize(sents.size());
+    #pragma omp parallel for
     for (size_t i = 0; i < sents.size(); ++i)
     {
-        cerr << "\r" << i;
+        cerr << "\r" << i << "    ";
         predict(sents[i], trees[i]);
         // result.push_back(predict(sents[i]));
     }

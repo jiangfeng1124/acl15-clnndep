@@ -10,6 +10,8 @@
 #include <cassert>
 #include <set>
 
+#include <omp.h>
+
 using namespace Eigen;
 using namespace std;
 
@@ -295,6 +297,7 @@ Cost NNClassifier::thread_proc(vector<Sample> & chunk, size_t batch_size)
         }
 
         VectorXd grad_hidden = VectorXd::Zero(config.hidden_size);
+        // #pragma omp parallel for
         for (size_t j = 0; j < active_units.size(); ++j)
         {
             int node_index = active_units[j];
@@ -491,6 +494,7 @@ void NNClassifier::compute_cost_function()
 
 void NNClassifier::back_prop_saved(Cost& cost, vector<int> & features_seen)
 {
+    #pragma omp parallel for
     for (size_t i = 0; i < features_seen.size(); ++i)
     {
         int map_x = pre_map[features_seen[i]];
@@ -520,21 +524,21 @@ void NNClassifier::back_prop_saved(Cost& cost, vector<int> & features_seen)
             cost.grad_Eb.row(E_index).noalias() +=
                 delta.transpose() * W1.block(0, offset, W1.rows(), emb_size);
         }
-        else if (feat_type == Config::BASIC_FEAT)
+        else if (feat_type == Config::DIST_FEAT)
         {
             cost.grad_W1.block(0, offset, W1.rows(), emb_size).noalias() +=
                 delta * Ed.row(E_index);
             cost.grad_Ed.row(E_index).noalias() +=
                 delta.transpose() * W1.block(0, offset, W1.rows(), emb_size);
         }
-        else if (feat_type == Config::BASIC_FEAT)
+        else if (feat_type == Config::VALENCY_FEAT)
         {
             cost.grad_W1.block(0, offset, W1.rows(), emb_size).noalias() +=
                 delta * Ev.row(E_index);
             cost.grad_Ev.row(E_index).noalias() +=
                 delta.transpose() * W1.block(0, offset, W1.rows(), emb_size);
         }
-        else if (feat_type == Config::BASIC_FEAT)
+        else if (feat_type == Config::CLUSTER_FEAT)
         {
             cost.grad_W1.block(0, offset, W1.rows(), emb_size).noalias() +=
                 delta * Ec.row(E_index);
@@ -968,6 +972,7 @@ void NNClassifier::pre_compute(
     saved.resize(pre_map.size(), config.hidden_size);
     saved.setZero();
 
+    #pragma omp parallel for
     for (size_t i = 0; i < candidates.size(); ++i)
     {
         int map_x = pre_map[candidates[i]];

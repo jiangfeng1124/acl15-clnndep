@@ -5,6 +5,10 @@
 #include "Dataset.h"
 // #include "math/mat.h"
 // #include <map>
+#ifndef EIGEN_USE_MKL_ALL
+    #define EIGEN_USE_MKL_ALL
+#endif
+
 #include <Eigen/Core>
 #include <Eigen/Dense>
 #include <unordered_map>

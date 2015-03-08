@@ -19,12 +19,12 @@ vector<int> & Sample::get_label()
 
 Sample::~Sample()
 {
-    feature.clear();
+//     feature.clear();
 }
 
 Dataset::~Dataset()
 {
-    samples.clear();
+//     samples.clear();
 }
 
 void Dataset::add_sample(vector<int> & feature, vector<int> & label)

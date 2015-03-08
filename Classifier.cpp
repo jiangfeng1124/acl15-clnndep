@@ -10,6 +10,8 @@
 #include <cassert>
 #include <set>
 
+#include <omp.h>
+
 using namespace std;
 
 
@@ -347,6 +349,7 @@ Cost NNClassifier::thread_proc(vector<Sample> & chunk, size_t batch_size)
         }
 
         Vec<double> grad_hidden(0.0, config.hidden_size);
+        // #pragma omp parallel for
         for (size_t j = 0; j < active_units.size(); ++j)
         {
             int node_index = active_units[j];
@@ -561,6 +564,7 @@ void NNClassifier::compute_cost_function()
 
 void NNClassifier::back_prop_saved(Cost& cost, vector<int> & features_seen)
 {
+    #pragma omp parallel for
     for (size_t i = 0; i < features_seen.size(); ++i)
     {
         int map_x = pre_map[features_seen[i]];
@@ -757,10 +761,10 @@ void NNClassifier::check_gradient()
     double diff_grad_W1 = Util::l2_norm(Util::mat_subtract(num_grad_W1, cost.grad_W1)) / Util::l2_norm(Util::mat_add(num_grad_W1, cost.grad_W1));
     double diff_grad_b1 = Util::l2_norm(Util::vec_subtract(num_grad_b1, cost.grad_b1)) / Util::l2_norm(Util::vec_add(num_grad_b1, cost.grad_b1));
     double diff_grad_W2 = Util::l2_norm(Util::mat_subtract(num_grad_W2, cost.grad_W2)) / Util::l2_norm(Util::mat_add(num_grad_W2, cost.grad_W2));
-    double diff_grad_Eb = Util::l2_norm(Util::mat_subtract(num_grad_Eb, cost.grad_Eb))  / Util::l2_norm(Util::mat_add(num_grad_Eb, cost.grad_Eb));
-    double diff_grad_Ed = Util::l2_norm(Util::mat_subtract(num_grad_Ed, cost.grad_Ed))  / Util::l2_norm(Util::mat_add(num_grad_Ed, cost.grad_Ed));
-    double diff_grad_Ev = Util::l2_norm(Util::mat_subtract(num_grad_Ev, cost.grad_Ev))  / Util::l2_norm(Util::mat_add(num_grad_Ev, cost.grad_Ev));
-    double diff_grad_Ec = Util::l2_norm(Util::mat_subtract(num_grad_Ec, cost.grad_Ec))  / Util::l2_norm(Util::mat_add(num_grad_Ec, cost.grad_Ec));
+    double diff_grad_Eb = Util::l2_norm(Util::mat_subtract(num_grad_Eb, cost.grad_Eb)) / Util::l2_norm(Util::mat_add(num_grad_Eb, cost.grad_Eb));
+    double diff_grad_Ed = Util::l2_norm(Util::mat_subtract(num_grad_Ed, cost.grad_Ed)) / Util::l2_norm(Util::mat_add(num_grad_Ed, cost.grad_Ed));
+    double diff_grad_Ev = Util::l2_norm(Util::mat_subtract(num_grad_Ev, cost.grad_Ev)) / Util::l2_norm(Util::mat_add(num_grad_Ev, cost.grad_Ev));
+    double diff_grad_Ec = Util::l2_norm(Util::mat_subtract(num_grad_Ec, cost.grad_Ec)) / Util::l2_norm(Util::mat_add(num_grad_Ec, cost.grad_Ec));
 
     /*
     for (int i = 0; i < num_grad_W2.nrows(); ++i)
@@ -795,7 +799,7 @@ void NNClassifier::compute_numerical_gradients(
         return ;
     }
 
-    double epsilon = 1e-4;
+    double epsilon = 1e-6;
     cerr << "checking W1..." << endl;
     // cerr << num_grad_W1.nrows() << ", " << num_grad_W1.ncols() << endl;
     cerr << W1.nrows() << ", " << W1.ncols() << endl;
@@ -1221,6 +1225,7 @@ void NNClassifier::pre_compute(
         for (int j = 0; j < saved.ncols(); ++j)
             saved[i][j] = 0.0;
 
+    #pragma omp parallel for
     for (size_t i = 0; i < candidates.size(); ++i)
     {
         int map_x = pre_map[candidates[i]];
