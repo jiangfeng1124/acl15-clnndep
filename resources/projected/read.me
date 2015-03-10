@@ -1,0 +1,38 @@
+Current projection process:
+
+0. python plug.py [original_en_embedding] [fine_tuned_en_embedding] > result
+
+    # [original_en_embedding] pre-trained en word embeddings
+    # [fine_tuned_en_embedding] fine-tuned en word embeddings extracted from model. (dump)
+
+    Example:
+        [PROJ] python plug.py en/en.50 en/en.proj.finetune > en/en.50.proj.finetuned
+        [PROJ+Cluster] python plug.py en/en.50 en/en.proj.dvc.finetune > en/en.50.proj.dvc.finetuned
+
+
+1. python project_emb.py [source_lang] [target_lang] [weighted=0|1]
+
+    # Note: puncs are hard-projected
+
+    # [source_lang] en
+    # [target_lang] de/es/fr
+    # [weighted] 0: max; 1: average
+
+    Example:
+        python project_emb.py en de 1
+        python project_emb.py en es 1
+        python project_emb.py en fr 1
+
+2. python post_process.py [depfile] [en_embedding] [fo_embedding] > [oov_embeddings]
+
+    # process digits and OOV, and some special words like "d'"
+    #   this process can be embedded into the the parsing code,
+    #   however, considering efficiency, we do it offline
+
+    # [depfile] test treebank
+
+3. cat [fo_embedding] [oov_embeddings] > [fo_final_embeddings]
+
+
+Step 1/2 should be merged.
+
