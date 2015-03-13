@@ -8,7 +8,7 @@
 class ArcStandard : public ParsingSystem
 {
     public:
-        ArcStandard() {};
+        ArcStandard() { lang = "english"; };
         explicit ArcStandard(std::vector<std::string>& ldict, bool is_labeled = true);
         ~ArcStandard();
 

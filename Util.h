@@ -56,16 +56,41 @@ class Util
                 int minibatch_size,
                 int cursor)
         {
+            /**
+             * There will be two parts of sub-vectors
+             *  - vector1: cursor -> end_pos1
+             *  - vector2: begin() -> (minibatch_size - (end_pos1 - cursor))
+             */
             output.clear();
 
             int input_size = input.size();
-            int end_pos = cursor + minibatch_size;
-            if (end_pos > input_size)
-                end_pos = input_size;
+            if (minibatch_size > input_size)
+            {
+                output = input;
+                return ;
+            }
 
-            typename std::vector<T>::const_iterator beg = input.begin() + cursor;
-            typename std::vector<T>::const_iterator end = input.begin() + end_pos;
-            output = std::vector<T>(beg, end);
+            int end_pos1 = cursor + minibatch_size;
+            int end_pos2 = 0;
+            if (end_pos1 > input_size)
+            {
+                end_pos1 = input_size;
+                end_pos2 = minibatch_size - (end_pos1 - cursor);
+            }
+
+            typename std::vector<T>::const_iterator beg1 = input.begin() + cursor;
+            typename std::vector<T>::const_iterator end1 = input.begin() + end_pos1;
+            std::vector<T> subvec1 = std::vector<T>(beg1, end1);
+
+            typename std::vector<T>::const_iterator beg2 = input.begin();
+            typename std::vector<T>::const_iterator end2 = input.begin() + end_pos2;
+            std::vector<T> subvec2 = std::vector<T>(beg2, end2);
+
+            output.reserve(subvec1.size() + subvec2.size());
+            // output = std::vector<T>(beg, end);
+            output.insert(output.end(), subvec1.begin(), subvec1.end());
+            if (end_pos2 > 0)
+                output.insert(output.end(), subvec2.begin(), subvec2.end());
         }
 
         template <typename T>

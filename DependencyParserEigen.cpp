@@ -58,7 +58,7 @@ void DependencyParser::train(
         const char * embed_file)
 {
     // omp_set_num_threads(config.training_threads);
-    // omp_set_num_threads(10);
+    omp_set_num_threads(20);
     int n_threads = omp_get_max_threads();
     if (n_threads > 1)
         cerr << "Using " << n_threads << " threads" << endl;

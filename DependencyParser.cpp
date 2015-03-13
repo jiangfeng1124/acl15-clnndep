@@ -44,21 +44,28 @@ void DependencyParser::train(
         string & train_file,
         string & dev_file,
         string & model_file,
-        string & embed_file)
+        string & embed_file,
+        string & premodel_file,
+        int sub_sampling)
 {
     train(train_file.c_str(),
             dev_file.c_str(),
             model_file.c_str(),
-            embed_file.c_str());
+            embed_file.c_str(),
+            premodel_file.c_str(),
+            sub_sampling);
 }
 
 void DependencyParser::train(
         const char * train_file,
         const char * dev_file,
         const char * model_file,
-        const char * embed_file)
+        const char * embed_file,
+        const char * premodel_file,
+        int sub_sampling)
 {
     // omp_set_num_threads(30);
+    omp_set_num_threads(6);
     int n_threads = omp_get_max_threads();
     if (n_threads > 1)
         cerr << "Using " << n_threads << " threads" << endl;
@@ -76,11 +83,23 @@ void DependencyParser::train(
 
     cerr << "Loading training file (conll)" << endl;
     Util::load_conll_file(train_file, train_sents, train_trees, config.labeled);
+    if (sub_sampling != -1 && (unsigned)sub_sampling < train_sents.size())
+    {
+        vector<DependencySent>::const_iterator s_beg = train_sents.begin();
+        vector<DependencySent>::const_iterator s_end = train_sents.begin() + sub_sampling;
+        train_sents = vector<DependencySent>(s_beg, s_end);
+
+        vector<DependencyTree>::const_iterator t_beg = train_trees.begin();
+        vector<DependencyTree>::const_iterator t_end = train_trees.begin() + sub_sampling;
+        train_trees = vector<DependencyTree>(t_beg, t_end);
+    }
+    cerr << "Sub-sampling " << sub_sampling << " sentences/trees for training." << endl;
+
     Util::print_tree_stats(train_trees);
 
     vector<DependencyTree> dev_trees;
     vector<DependencySent> dev_sents;
-    if (dev_file != NULL)
+    if (dev_file[0] != 0)
     {
         cerr << "Loading devel file (conll)" << endl;
         Util::load_conll_file(dev_file, dev_sents, dev_trees, config.labeled);
@@ -101,12 +120,11 @@ void DependencyParser::train(
 
     // TODO
     vector<string> ldict = known_labels;
-    if (config.labeled)
-        ldict.pop_back(); // remove the NIL label
+    if (config.labeled) ldict.pop_back(); // remove the NIL label
     system = new ArcStandard(ldict, config.labeled);
 
     cerr << "Setup classifier for training" << endl;
-    setup_classifier_for_training(train_sents, train_trees, embed_file);
+    setup_classifier_for_training(train_sents, train_trees, embed_file, premodel_file);
     config.print_info();
 
     /**
@@ -114,10 +132,6 @@ void DependencyParser::train(
      */
     // classifier->check_gradient();
     // classifier->check_gradient();
-
-    /**
-     * train classifier by calling classifier.train
-     */
 
     save_model(string(model_file)); // can rename
 
@@ -148,13 +162,12 @@ void DependencyParser::train(
         else
             classifier->take_ada_gradient_step();
 
-        if (dev_file != NULL &&
+        if (dev_file[0] != 0 &&
                 iter % config.eval_per_iter == 0)
         {
             classifier->pre_compute(); // with updated weights
             vector<DependencyTree> predicted;
             predict(dev_sents, predicted);
-            // double uas = system->get_uas_score(dev_sents, predicted, dev_trees);
 
             map<string, double> result;
             system->evaluate(dev_sents, predicted, dev_trees, result);
@@ -189,7 +202,7 @@ void DependencyParser::train(
 
     classifier->finalize_training();
 
-    if (dev_file != NULL)
+    if (dev_file[0] != 0)
     {
         vector<DependencyTree> predicted;
         predict(dev_sents, predicted);
@@ -219,6 +232,86 @@ void DependencyParser::train(
     {
         save_model(model_file);
     }
+}
+
+void DependencyParser::finetune(
+                const char * train_file, // target language
+                const char * model_file,
+                const char * emb_file,
+                int sub_sampling)
+{
+    omp_set_num_threads(config.training_threads);
+    int n_threads = omp_get_max_threads();
+    if (n_threads > 1)
+        cerr << "Using " << n_threads << " threads" << endl;
+
+    cerr << "Finetuning model:      " << model_file << endl;
+    cerr << "Training file:         " << train_file << endl;
+    cerr << "Target embedding file: " << emb_file   << endl;
+
+    // load training data from target language
+    vector<DependencyTree> train_trees;
+    vector<DependencySent> train_sents;
+
+    cerr << "Loading training file (conll) for finetuning" << endl;
+    Util::load_conll_file(train_file, train_sents, train_trees, config.labeled);
+    if (sub_sampling != -1 && (unsigned)sub_sampling < train_sents.size())
+    {
+        vector<DependencySent>::const_iterator s_beg = train_sents.begin();
+        vector<DependencySent>::const_iterator s_end = train_sents.begin() + sub_sampling;
+        train_sents = vector<DependencySent>(s_beg, s_end);
+
+        vector<DependencyTree>::const_iterator t_beg = train_trees.begin();
+        vector<DependencyTree>::const_iterator t_end = train_trees.begin() + sub_sampling;
+        train_trees = vector<DependencyTree>(t_beg, t_end);
+    }
+
+    cerr << "Sub-sampling " << sub_sampling << " sentences/trees for finetuning." << endl;
+
+    Util::print_tree_stats(train_trees);
+    // Attention: no dev trees are used here
+
+    // gen_dictionaries(train_sents, train_trees);
+
+    // Load model, ignore word embeddings (n_dict) from source language
+    // instead, fill with word embeddings from target language.
+    //  - NB: keep the three tokens from SL (ROOT, UNKNOWN, NULL).
+    //
+    // Besides, fix_word_embeddings should be true
+    cerr << "Load model trained from source language." << endl;
+    load_model_cl(model_file, emb_file);
+
+    Dataset dataset = gen_train_samples(train_sents, train_trees);
+    // classifier = new NNClassifier(config, dataset, Eb, Ed, Ev, Ec, W1, b1, W2, pre_computed_ids);
+    if (classifier) delete classifier;
+    classifier->set_dataset(dataset, pre_computed_ids);
+    config.print_info();
+
+    // fine-tuning
+    assert (config.fix_word_embeddings == true);
+    for (int iter = 0; iter < config.finetune_iter; ++iter)
+    {
+        double before = get_time();
+        classifier->compute_cost_function();
+        double after = get_time();
+        cerr << "#Iteration " << (iter + 1) << ": "
+             << "Cost = " << classifier->get_loss()
+             << ", Correct(%) = " << classifier->get_accuracy()
+             << " (" << (after - before) << ")"
+             << endl;
+
+        classifier->take_ada_gradient_step(known_words.size() - 3);
+    }
+    save_model(string(model_file) + ".finetuned");
+}
+
+void DependencyParser::finetune(
+                std::string & train_file, // target language
+                std::string & model_file,
+                std::string & emb_file,
+                int sub_sampling)
+{
+    finetune(train_file.c_str(), model_file.c_str(), emb_file.c_str(), sub_sampling);
 }
 
 void DependencyParser::gen_dictionaries(
@@ -327,7 +420,19 @@ void DependencyParser::gen_dictionaries(
 
     if (config.labeled)
     {
-        known_labels.push_back(root_label);
+        /**
+         * In case that there are multiple root_labels
+         *  which are unnecessarily attached to w_0
+         *
+         * In fact, this is not kind of legal annotation,
+         *  however, it indeed appears in the universal
+         *  dependency treebanks.
+         */
+        if (find(known_labels.begin(),
+                    known_labels.end(),
+                    root_label)
+                == known_labels.end())
+            known_labels.push_back(root_label);
         known_labels.push_back(Config::NIL);
     }
     else
@@ -425,7 +530,8 @@ void DependencyParser::collect_dynamic_features(
 void DependencyParser::setup_classifier_for_training(
         vector<DependencySent> & sents,
         vector<DependencyTree> & trees,
-        const char * embed_file)
+        const char * embed_file,
+        const char * premodel_file)
 {
     int Eb_entries = 0;
     int Ed_entries = 0, Ev_entries = 0, Ec_entries = 0;
@@ -444,18 +550,10 @@ void DependencyParser::setup_classifier_for_training(
     if (config.use_cluster)
         Ec_entries = known_clusters.size();
 
-    Mat<double> Eb(0.0,
-                  Eb_entries,
-                  config.embedding_size);
-    Mat<double> Ed(0.0,
-                  Ed_entries,
-                  config.distance_embedding_size);
-    Mat<double> Ev(0.0,
-                  Ev_entries,
-                  config.valency_embedding_size);
-    Mat<double> Ec(0.0,
-                  Ec_entries,
-                  config.cluster_embedding_size);
+    Mat<double> Eb(0.0, Eb_entries, config.embedding_size);
+    Mat<double> Ed(0.0, Ed_entries, config.distance_embedding_size);
+    Mat<double> Ev(0.0, Ev_entries, config.valency_embedding_size);
+    Mat<double> Ec(0.0, Ec_entries, config.cluster_embedding_size);
 
     int W1_ncol = config.embedding_size * config.num_basic_tokens;
     if (config.use_distance)
@@ -550,6 +648,120 @@ void DependencyParser::setup_classifier_for_training(
          << known_words.size()
          << endl;
 
+    if (premodel_file[0] != 0)
+    {
+        // load model
+        // load_model(premodel_file);
+        cerr << "Load pre-trained model: " << premodel_file << endl;
+        ifstream input(premodel_file);
+        string s;
+        getline(input, s); int n_dict = to_int(split_by_sep(s, "=")[1]);
+        getline(input, s); int n_pos = to_int(split_by_sep(s, "=")[1]);
+        getline(input, s); int n_label = to_int(split_by_sep(s, "=")[1]);
+        getline(input, s); int n_dist = to_int(split_by_sep(s, "=")[1]);
+        getline(input, s); int n_valency = to_int(split_by_sep(s, "=")[1]);
+        getline(input, s); int n_cluster = to_int(split_by_sep(s, "=")[1]);
+        getline(input, s); int Eb_size = to_int(split_by_sep(s, "=")[1]);
+        getline(input, s); int Ed_size = to_int(split_by_sep(s, "=")[1]);
+        getline(input, s); int Ev_size = to_int(split_by_sep(s, "=")[1]);
+        getline(input, s); int Ec_size = to_int(split_by_sep(s, "=")[1]);
+        getline(input, s); int h_size = to_int(split_by_sep(s, "=")[1]);
+        getline(input, s); int n_basic_tokens = to_int(split_by_sep(s, "=")[1]);
+        getline(input, s); int n_dist_tokens = to_int(split_by_sep(s, "=")[1]);
+        getline(input, s); int n_valency_tokens = to_int(split_by_sep(s, "=")[1]);
+        getline(input, s); int n_cluster_tokens = to_int(split_by_sep(s, "=")[1]);
+        getline(input, s); int n_pre_computed = to_int(split_by_sep(s, "=")[1]);
+
+        assert (h_size == config.hidden_size);
+        assert (n_basic_tokens == config.num_basic_tokens);
+        assert (n_dist_tokens == config.num_dist_tokens);
+        assert (n_valency_tokens == config.num_valency_tokens);
+        assert (n_cluster_tokens == config.num_cluster_tokens);
+
+        vector<string> sep;
+
+        if (!config.delexicalized)
+            for (int i = 0; i < n_dict; ++i)
+            {
+                getline(input, s);
+                sep = split(s);
+                int index = get_word_id(sep[0]);
+                if (index != Config::NONEXIST)
+                    for (int j = 0; j < Eb_size; ++j)
+                        Eb[index][j] = to_double_sci(sep[j]);
+            }
+        if (config.use_postag)
+            for (int i = 0; i < n_pos; ++i)
+            {
+                getline(input, s);
+                sep = split(s);
+                int index = get_pos_id(sep[0]);
+                for (int j = 0; j < Eb_size; ++j)
+                    Eb[index][j] = to_double_sci(sep[j]);
+            }
+        if (config.labeled)
+            for (int i = 0; i < n_label; ++i)
+            {
+                getline(input, s);
+                sep = split(s);
+                int index = get_label_id(sep[0]);
+                for (int j = 0; j < Eb_size; ++j)
+                    Eb[index][j] = to_double_sci(sep[j+1]);
+            }
+        if (config.use_distance)
+            for (int i = 0; i < n_dist; ++i)
+            {
+                getline(input, s);
+                sep = split(s);
+                int index = get_distance_id(to_int(sep[0]));
+                for (int j = 0; j < Ed_size; ++j)
+                    Ed[index][j] = to_double_sci(sep[j+1]);
+            }
+        if (config.use_valency)
+            for (int i = 0; i < n_valency; ++i)
+            {
+                getline(input, s);
+                sep = split(s);
+                int index = get_valency_id(sep[0]);
+                for (int j = 0; j < Ev_size; ++j)
+                    Ev[index][j] = to_double_sci(sep[j+1]);
+            }
+        if (config.use_cluster)
+            for (int i = 0; i < n_cluster; ++i)
+            {
+                getline(input, s);
+                sep = split(s);
+                int index = get_cluster_id(sep[0]);
+                for (int j = 0; j < Ec_size; ++j)
+                    Ec[index][j] = to_double_sci(sep[j+1]);
+            }
+
+        // set W1
+        for (int j = 0; j < W1.ncols(); ++j)
+        {
+            getline(input, s);
+            sep = split(s);
+            for (int i = 0; i < W1.nrows(); ++i)
+                W1[i][j] = to_double_sci(sep[i]);
+        }
+
+        // set b1
+        getline(input, s);
+        sep = split(s);
+        for (int i = 0; i < b1.size(); ++i)
+            b1[i] = to_double_sci(sep[i]);
+
+        for (int j = 0; j < W2.ncols(); ++j)
+        {
+            getline(input, s);
+            sep = split(s);
+            for (int i = 0; i < W2.nrows(); ++i)
+                W2[i][j] = to_double_sci(sep[i]);
+        }
+
+        input.close();
+    }
+
     /**
      * generate training dataset and
      * determine the pre_computed ids (important)
@@ -567,16 +779,7 @@ void DependencyParser::setup_classifier_for_training(
      * setup the classifier
      */
     cerr << "create classifier" << endl;
-    classifier = new NNClassifier(config,
-                                    dataset,
-                                    Eb,
-                                    Ed,
-                                    Ev,
-                                    Ec,
-                                    W1,
-                                    b1,
-                                    W2,
-                                    pre_computed_ids);
+    classifier = new NNClassifier(config, dataset, Eb, Ed, Ev, Ec, W1, b1, W2, pre_computed_ids);
 }
 
 void DependencyParser::generate_ids()
@@ -638,7 +841,8 @@ Dataset DependencyParser::gen_train_samples(
         vector<DependencySent> & sents,
         vector<DependencyTree> & trees)
 {
-    Dataset ds_train(config.num_tokens, system->transitions.size());
+    int num_trans = system->transitions.size();
+    Dataset ds_train(config.num_tokens, num_trans);
 
     cerr << Config::SEPERATOR << endl;
     cerr << "Generating training examples..." << endl;
@@ -671,8 +875,8 @@ Dataset DependencyParser::gen_train_samples(
 
                 vector<int> features = get_features(c);
                 // int label = system->get_transition_id(oracle);
-                vector<int> label(system->transitions.size(), -1);
-                for (size_t j = 0; j < system->transitions.size(); ++j)
+                vector<int> label(num_trans, -1);
+                for (int j = 0; j < num_trans; ++j)
                 {
                     string action = system->transitions[j];
                     if (action == oracle) label[j] = 1;
@@ -1064,19 +1268,6 @@ vector<int> DependencyParser::get_features(Configuration& c)
 
     return features;
 }
-
-/*
-Vec<int> get_features_array(Configuration& c)
-{
-    Vec<int> features(0, config.num_tokens);
-
-    for (int i = 2; i >= 0; --j)
-    {
-        int index = c.get_stack(j);
-        features[2-i] = get_word_id(c.get_word(index));
-    }
-}
-*/
 
 int DependencyParser::get_word_id(const string & s)
 {

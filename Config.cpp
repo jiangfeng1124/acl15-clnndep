@@ -38,6 +38,7 @@ void Config::init()
     word_cut_off            = 1;
     init_range              = 0.010;
     max_iter                = 20000;
+    finetune_iter           = 5000;
     batch_size              = 10000;
     ada_eps                 = 1.0e-6;
     ada_alpha               = 0.010;
@@ -108,6 +109,7 @@ void Config::set_properties(const char * filename)
     cfg_set_int(props, "training_threads",          training_threads);
     cfg_set_int(props, "word_cut_off",              word_cut_off);
     cfg_set_int(props, "max_iter",                  max_iter);
+    cfg_set_int(props, "finetune_iter",             finetune_iter);
     cfg_set_int(props, "batch_size",                batch_size);
     cfg_set_int(props, "hidden_size",               hidden_size);
     cfg_set_int(props, "embedding_size",            embedding_size);
@@ -212,6 +214,7 @@ void Config::print_info()
     cerr << "word_cut_off            = " << word_cut_off            << endl;
     cerr << "init_range              = " << init_range              << endl;
     cerr << "max_iter                = " << max_iter                << endl;
+    cerr << "finetune_iter           = " << finetune_iter           << endl;
     cerr << "batch_size              = " << batch_size              << endl;
     cerr << "ada_eps                 = " << ada_eps                 << endl;
     cerr << "ada_alpha               = " << ada_alpha               << endl;
@@ -278,12 +281,15 @@ int Config::get_offset(int pos)
     else if (feat_type == VALENCY_FEAT)
         offset = num_basic_tokens * embedding_size
             + num_dist_tokens * distance_embedding_size
-            + (pos - num_basic_tokens - num_dist_tokens) * valency_embedding_size;
+            + (pos - num_basic_tokens
+                   - num_dist_tokens) * valency_embedding_size;
     else if (feat_type == CLUSTER_FEAT)
         offset = num_basic_tokens * embedding_size
             + num_dist_tokens * distance_embedding_size
             + num_valency_tokens * valency_embedding_size
-            + (pos - num_basic_tokens - num_dist_tokens - num_valency_tokens) * cluster_embedding_size;
+            + (pos - num_basic_tokens
+                   - num_dist_tokens
+                   - num_valency_tokens) * cluster_embedding_size;
 
     return offset;
 }

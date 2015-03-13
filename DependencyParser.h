@@ -22,13 +22,29 @@ class DependencyParser
                 const char * train_file,
                 const char * dev_file,
                 const char * model_file,
-                const char * embed_file);
+                const char * embed_file,
+                const char * premodel_file,
+                int sub_sampling = -1);
 
         void train(
                 std::string & train_file,
                 std::string & dev_file,
                 std::string & model_file,
-                std::string & embed_file);
+                std::string & embed_file,
+                std::string & premodel_file,
+                int sub_sampling = -1);
+
+        void finetune(
+                const char * train_file, // target language
+                const char * model_file,
+                const char * emb_file,
+                int sub_sampling = -1);
+
+        void finetune(
+                std::string & train_file, // target language
+                std::string & model_file,
+                std::string & emb_file,
+                int sub_sampling = -1);
 
         /**
          * if re_precompute is true, then do precomputing
@@ -55,7 +71,8 @@ class DependencyParser
         void setup_classifier_for_training(
                 std::vector<DependencySent> & sents,
                 std::vector<DependencyTree> & trees,
-                const char * embed_file);
+                const char * embed_file,
+                const char * premodel_file);
 
         void read_embed_file(const char * embed_file);
 

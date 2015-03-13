@@ -8,6 +8,7 @@
  */
 
 #include "DependencyParser.h"
+#include "strutils.h"
 #include <cstring>
 #include <cstdlib>
 #include <ctime>
@@ -18,21 +19,21 @@ using namespace std;
 
 typedef struct
 {
-    // training mode
-    bool   is_train;
-    // testing mode
-    bool   is_test;
-    // cross-lingual testing mode
-    bool   is_cltest;
+    bool   is_train;  // training mode
+    bool   is_test;   // testing mode
+    bool   is_cltest; // cross-lingual testing mode
+    bool   is_finetune; // cross-lingual fine-tuning mode
 
     string train_file;
     string dev_file;
     string test_file;
     string model_file;
+    string premodel_file;
     string emb_file;
     string clemb_file;
     string cfg_file;
     string output_file;
+    int sub_sampling;
 
 } Option;
 
@@ -64,6 +65,8 @@ void print_usage()
          << "\t\tUse <file> for evaluation during training (CoNLL format)\n"
          << "\t-model <file>\n"
          << "\t\tUse <file> for saving model\n"
+         << "\t-premodel <file>\n"
+         << "\t\tUse <file> as pre-trained model\n"
          << "\t-emb <file>\n"
          << "\t\tPre-trained word embeddings, for initialization\n"
          << "\t-cltest <file>\n"
@@ -74,6 +77,10 @@ void print_usage()
          << "\t\tConfig file for training neural network classifier\n"
          << "\t-output <file>\n"
          << "\t\tOutput predicted parsing trees to <file>\n"
+         << "\t-sample <num>\n"
+         << "\t\tTraining with a subset of <num> sentences\n"
+         << "\t-finetune <file>\n"
+         << "\t\tUse <file>(target language) for finetuning the model\n"
          << "\nExample(train):\n"
          << "./nndep -train data/train.dep -dev data/dev.dep"
          <<        " -model model -emb data/words.emb -cfg nndep.cfg\n"
@@ -106,6 +113,8 @@ void parse_command_line(int argc, char ** argv)
     opt.is_train = false;
     opt.is_test  = false;
     opt.is_cltest = false;
+    opt.is_finetune = false;
+    opt.sub_sampling = -1;
     opt.model_file = "model";
 
     int i;
@@ -126,16 +135,25 @@ void parse_command_line(int argc, char ** argv)
         opt.is_cltest = true;
         opt.test_file = argv[i + 1];
     }
-    if ((i = arg_pos((char *)"-clemb", argc, argv)) > 0)
+    if ((i = arg_pos((char *)"-finetune", argc, argv)) > 0)
+    {
+        opt.is_finetune = true;
+        opt.train_file = argv[i + 1];
+    }
+    if ((i = arg_pos((char *)"-clemb",  argc, argv)) > 0)
         opt.clemb_file = argv[i + 1];
     if ((i = arg_pos((char *)"-model",  argc, argv)) > 0)
         opt.model_file = argv[i + 1];
+    if ((i = arg_pos((char *)"-premodel", argc, argv)) > 0)
+        opt.premodel_file = argv[i + 1];
     if ((i = arg_pos((char *)"-emb",    argc, argv)) > 0)
         opt.emb_file = argv[i + 1];
     if ((i = arg_pos((char *)"-cfg",    argc, argv)) > 0)
         opt.cfg_file = argv[i + 1];
     if ((i = arg_pos((char *)"-output", argc, argv)) > 0)
         opt.output_file = argv[i + 1];
+    if ((i = arg_pos((char *)"-sample", argc, argv)) > 0)
+        opt.sub_sampling = to_int(argv[i + 1]);
 }
 
 int main(int argc, char** argv)
@@ -149,8 +167,8 @@ int main(int argc, char** argv)
     parse_command_line(argc, argv);
     cerr << opt.cfg_file << endl;
 
-    // srand(time(NULL));
-    srand(12345);
+    srand(time(NULL));
+    // srand(12345);
 
     DependencyParser parser(opt.cfg_file);
 
@@ -160,7 +178,18 @@ int main(int argc, char** argv)
         parser.train(opt.train_file,
                 opt.dev_file,
                 opt.model_file,
-                opt.emb_file);
+                opt.emb_file,
+                opt.premodel_file,
+                opt.sub_sampling);
+        loaded = true;
+    }
+
+    if (opt.is_finetune) // note: for cross-lingual learning
+    {
+        parser.finetune(opt.train_file,
+                opt.model_file,
+                opt.emb_file,
+                opt.sub_sampling);
         loaded = true;
     }
 

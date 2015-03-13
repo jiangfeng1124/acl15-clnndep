@@ -10,10 +10,12 @@ int main(int argc, char** argv)
 
     Util::load_conll_file(filepath.c_str(), sents, trees, true);
 
+    int n_proj = 0;
     for (size_t i = 0; i < trees.size(); ++i)
     {
         if (trees[i].is_projective())
         {
+            n_proj ++;
             cerr << "\r" << i;
             for (int j = 0; j < sents[i].n; ++j)
             {
@@ -35,6 +37,7 @@ int main(int argc, char** argv)
         }
     }
     cerr << endl;
+    cerr << "Proj / All = " << n_proj << " / " << trees.size() << endl;
 
     return 0;
 }

@@ -4,6 +4,8 @@
 #include <chrono>
 #include "ThreadPool.h"
 
+#include "fastexp.h"
+
 #include <cstdlib>
 #include <ctime>
 #include <cmath>
@@ -220,7 +222,10 @@ Cost NNClassifier::thread_proc(vector<Sample> & chunk, size_t batch_size)
         // add bias term
         // activate
         hidden.noalias() += b1;
-        hidden.noalias() = hidden.cwiseProduct(mask); // dropout
+        // hidden.noalias() = hidden.cwiseProduct(mask); // dropout
+        for (int j = 0; j < mask.size(); ++j)
+            if (mask(j) == 0)
+                hidden(j) = 0;
 
         hidden3 = hidden.cwiseProduct(hidden).cwiseProduct(hidden);
 
@@ -254,7 +259,7 @@ Cost NNClassifier::thread_proc(vector<Sample> & chunk, size_t batch_size)
         {
             if (label[j] >= 0)
             {
-                scores(j) = exp(scores(j) - max_score);
+                scores(j) = fastexp(scores(j) - max_score);
                 if (label[j] == 1) sum1 += scores(j);
                 sum2 += scores(j);
             }
@@ -329,7 +334,7 @@ Cost NNClassifier::thread_proc(vector<Sample> & chunk, size_t batch_size)
             if (pre_map.find(index) != pre_map.end())
             {
                 int id = pre_map[index];
-                grad_saved.row(id).noalias() += grad_hidden.cwiseProduct(mask);
+                grad_saved.row(id).noalias() += grad_hidden;
             }
             else
             {
@@ -337,33 +342,33 @@ Cost NNClassifier::thread_proc(vector<Sample> & chunk, size_t batch_size)
                 if (feat_type == Config::BASIC_FEAT)
                 {
                     grad_W1.block(0, offset, W1.rows(), emb_size).noalias() +=
-                        grad_hidden.cwiseProduct(mask) * Eb.row(E_index);
+                        grad_hidden * Eb.row(E_index);
                     grad_Eb.row(E_index).noalias() +=
-                        grad_hidden.cwiseProduct(mask).transpose() *
+                        grad_hidden.transpose() *
                         W1.block(0, offset, W1.rows(), emb_size);
                 }
                 else if (feat_type == Config::DIST_FEAT)
                 {
                     grad_W1.block(0, offset, W1.rows(), emb_size).noalias() +=
-                        grad_hidden.cwiseProduct(mask) * Ed.row(E_index);
+                        grad_hidden * Ed.row(E_index);
                     grad_Ed.row(E_index).noalias() +=
-                        grad_hidden.cwiseProduct(mask).transpose() *
+                        grad_hidden.transpose() *
                         W1.block(0, offset, W1.rows(), emb_size);
                 }
                 else if (feat_type == Config::VALENCY_FEAT)
                 {
                     grad_W1.block(0, offset, W1.rows(), emb_size).noalias() +=
-                        grad_hidden.cwiseProduct(mask) * Ev.row(E_index);
+                        grad_hidden * Ev.row(E_index);
                     grad_Ev.row(E_index).noalias() +=
-                        grad_hidden.cwiseProduct(mask).transpose() *
+                        grad_hidden.transpose() *
                         W1.block(0, offset, W1.rows(), emb_size);
                 }
                 else if (feat_type == Config::CLUSTER_FEAT)
                 {
                     grad_W1.block(0, offset, W1.rows(), emb_size).noalias() +=
-                        grad_hidden.cwiseProduct(mask) * Ec.row(E_index);
+                        grad_hidden * Ec.row(E_index);
                     grad_Ec.row(E_index).noalias() +=
-                        grad_hidden.cwiseProduct(mask).transpose() *
+                        grad_hidden.transpose() *
                         W1.block(0, offset, W1.rows(), emb_size);
                 }
             }
@@ -829,7 +834,7 @@ double NNClassifier::compute_cost()
         {
             if (label[j] >= 0)
             {
-                scores(j) = exp(scores(j) - max_score);
+                scores(j) = fastexp(scores(j) - max_score);
                 if (label[j] == 1) sum1 += scores(j);
                 sum2 += scores(j);
             }

@@ -136,8 +136,8 @@ class NNClassifier
     public:
         NNClassifier();
         NNClassifier(
-                const Config& config,
-                const Dataset& dataset,
+                const Config& _config,
+                const Dataset& _dataset,
                 const Mat<double>& _Eb,
                 const Mat<double>& _Ed,
                 const Mat<double>& _Ev,
@@ -147,7 +147,7 @@ class NNClassifier
                 const Mat<double>& _W2,
                 const std::vector<int>& pre_computed_ids);
         NNClassifier(
-                const Config& config,
+                const Config& _config,
                 const Mat<double>& _Eb,
                 const Mat<double>& _Ed,
                 const Mat<double>& _Ev,
@@ -157,6 +157,11 @@ class NNClassifier
                 const Mat<double>& _W2,
                 const std::vector<int>& pre_computed_ids);
         NNClassifier(const NNClassifier & classifier);
+
+        // set dataset for training/finetuning
+        void set_dataset(
+                const Dataset & _dataset,
+                const std::vector<int> & pre_computed_ids);
 
         ~NNClassifier() {}// TODO
 

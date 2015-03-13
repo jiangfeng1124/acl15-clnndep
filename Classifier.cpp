@@ -4,6 +4,8 @@
 #include <chrono>
 #include "ThreadPool.h"
 
+#include "fastexp.h"
+
 #include <cstdlib>
 #include <ctime>
 #include <cmath>
@@ -21,15 +23,11 @@ using namespace std;
  * Definition of static variables
  */
 Mat<double> NNClassifier::grad_saved;
-
 Mat<double> NNClassifier::saved;
-
 unordered_map<int, int> NNClassifier::pre_map;
 
 Mat<double> NNClassifier::W1;
-
 Vec<double> NNClassifier::b1;
-
 Mat<double> NNClassifier::W2;
 
 Mat<double> NNClassifier::Eb;
@@ -141,6 +139,30 @@ NNClassifier::NNClassifier(
     grad_saved.resize(pre_map.size(), config.hidden_size);
 
     debug = false;
+}
+
+void NNClassifier::set_dataset(
+        const Dataset & _dataset,
+        const vector<int> & pre_computed_ids)
+{
+    dataset = _dataset;
+
+    init_gradient_histories();
+
+    num_labels = W2.nrows(); // number of transitions
+
+    cursor = 0;
+
+    // /* debug
+    for (size_t i = 0; i < pre_computed_ids.size(); ++i)
+    {
+        pre_map[pre_computed_ids[i]] = i;
+    }
+    // */
+
+    print_info();
+
+    grad_saved.resize(pre_map.size(), config.hidden_size);
 }
 
 Cost NNClassifier::thread_proc(vector<Sample> & chunk, size_t batch_size)
@@ -265,6 +287,11 @@ Cost NNClassifier::thread_proc(vector<Sample> & chunk, size_t batch_size)
             hidden[node_index] += b1[node_index];
             // cube active function
             hidden3[node_index] = pow(hidden[node_index], 3);
+            // clip: not sure whether it's right
+            if (hidden3[node_index] > 50)
+                hidden3[node_index] = 50;
+            if (hidden3[node_index] < -50)
+                hidden3[node_index] = -50;
         }
 
         /*
@@ -288,8 +315,9 @@ Cost NNClassifier::thread_proc(vector<Sample> & chunk, size_t batch_size)
                 int node_index = active_units[k];
                 scores[j] += W2[j][node_index] * hidden3[node_index];
             }
-            if (opt_label < 0 || scores[j] > scores[opt_label])
-                opt_label = j;
+            if (label[j] >= 0)
+                if (opt_label < 0 || scores[j] > scores[opt_label])
+                    opt_label = j;
         }
 
         /*
@@ -302,14 +330,27 @@ Cost NNClassifier::thread_proc(vector<Sample> & chunk, size_t batch_size)
         double sum1 = .0;
         double sum2 = .0;
         double max_score = scores[opt_label];
+        Vec<double> tmp = scores;
         for (int j = 0; j < num_labels; ++j)
         {
             if (label[j] >= 0)
             {
-                scores[j] = exp(scores[j] - max_score);
+                scores[j] = fasterexp(scores[j] - max_score);
                 if (label[j] == 1) sum1 += scores[j];
                 sum2 += scores[j];
             }
+        }
+        if (sum1 == 0)
+        {
+            cerr << "Original: " << endl;
+            for (int j = 0; j < scores.size(); ++j)
+                cerr << label[j] << ": " << tmp[j] << ", ";
+            cerr << endl;
+            cerr << "opt_label = " << opt_label << endl;
+            cerr << "max_score = " << max_score << endl;
+            for (int j = 0; j < scores.size(); ++j)
+                cerr << label[j] << ": " << scores[j] << ", ";
+            cerr << endl;
         }
 
         /*
@@ -431,6 +472,7 @@ Cost NNClassifier::thread_proc(vector<Sample> & chunk, size_t batch_size)
         }
     }
 
+    // cerr << "Thread loss = " << loss << endl;
     loss /= batch_size;
     double accuracy = (double)correct / batch_size;
 
@@ -491,7 +533,8 @@ void NNClassifier::compute_cost_function()
             config.batch_size,
             cursor);
     cursor += samples.size();
-    if (cursor >= dataset.n) cursor = 0; // start over
+    if (cursor >= dataset.n)
+        cursor = cursor - dataset.n; // equals to cursor % dataset.n
 
     cerr << "Sample " << samples.size() << " samples for training" << endl;
 
@@ -983,7 +1026,7 @@ double NNClassifier::compute_cost()
         {
             if (label[j] >= 0)
             {
-                scores[j] = exp(scores[j] - max_score);
+                scores[j] = fasterexp(scores[j] - max_score);
                 // scores[j] = exp(scores[j]);
                 if (label[j] == 1) sum1 += scores[j];
                 sum2 += scores[j];

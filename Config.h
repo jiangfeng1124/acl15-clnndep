@@ -33,6 +33,8 @@ class Config
 
         int max_iter;
 
+        int finetune_iter;
+
         int batch_size;
 
         /**
