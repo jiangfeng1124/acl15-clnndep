@@ -15,7 +15,7 @@ def is_digit4(w):
 en_clusters = {}
 fo_clusters = {}
 
-def load_clusters(path):
+def load_clusters(path, clusters):
     for l in open(path):
         l = l.strip().split()
         clusters[l[1]] = l[0]
@@ -38,7 +38,9 @@ threshold = 1
 
 def find_most_similar(w, thresh):
     ed = defaultdict(list)
-    for wd,c in clusters.items():
+    for wd,c in fo_clusters.items():
+        if abs(len(wd) - len(w)) > thresh:
+            continue
         d = eval(w, wd)
         if d > thresh: continue
         ed[d].append(wd)
@@ -49,10 +51,13 @@ def find_most_similar(w, thresh):
             return ed[i]
 
 cache = {}
-for l in open(sys.argv[1]):
+for i, l in enumerate(open(sys.argv[1])):
+
+    if i % 100 == 0:
+        print >> sys.stderr, "[%d]" % (i)
 
     l = l.strip().split()
-    if len(l) < 2: print; continue
+    if len(l) < 2: continue
 
     word = l[1].lower()
 
@@ -82,7 +87,7 @@ for l in open(sys.argv[1]):
             if cands != None:
                 sim_cls = defaultdict(int)
                 for w in cands:
-                    c = clusters[w]
+                    c = fo_clusters[w]
                     sim_cls[c] += 1
                 sorted_sim_cls = sorted(sim_cls.items(), key = operator.itemgetter(1), reverse=True)
                 cache[word] = sorted_sim_cls[0][0]
@@ -91,5 +96,5 @@ for l in open(sys.argv[1]):
     # print "\t".join(l)
 
 for w, c in cache.items():
-    print "%s\t%s" % (c, w, 1)
+    print "%s\t%s\t1" % (c, w)
 

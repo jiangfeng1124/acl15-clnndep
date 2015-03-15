@@ -58,7 +58,9 @@ bool ArcStandard::can_apply(Configuration& c, const string& t)
             // set<string> punc_tags = get_punctuation_tags();
             // if (punc_tags.find(c.get_pos(h)) != punc_tags.end()) return false;
             if (h == 0 && !(label == root_label))   return false;
-            // if (h > 0 && (label == root_label))     //return false;
+
+            // When training parsers for multi-rooted data, comment the following lines
+            if (h > 0 && (label == root_label))     return false;
             //     cerr << "h > 0 and label == root_label" << endl;
         }
     }

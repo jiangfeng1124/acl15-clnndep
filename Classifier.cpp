@@ -598,7 +598,6 @@ void NNClassifier::compute_cost_function()
     // /* debug
     back_prop_saved(cost, feature_ids_to_pre_compute);
     // */
-    // cerr << "cost.grad_w1[0][0]" << cost.grad_W1[0][0] << endl;
 
     // cerr << "loss = " << cost.loss << endl;
     // cerr << "accuracy = " << cost.percent_correct << endl;
@@ -607,10 +606,13 @@ void NNClassifier::compute_cost_function()
 
 void NNClassifier::back_prop_saved(Cost& cost, vector<int> & features_seen)
 {
-    #pragma omp parallel for
+    // #pragma omp parallel for
     for (size_t i = 0; i < features_seen.size(); ++i)
     {
+        // cerr << "cost.grad_Eb[0][0]" << cost.grad_Eb[0][0] << endl;
+
         int map_x = pre_map[features_seen[i]];
+
         int tok = features_seen[i] / config.num_tokens;
         // int offset = (features_seen[i] % config.num_tokens) * config.embedding_size;
         int pos = features_seen[i] % config.num_tokens;
@@ -660,6 +662,7 @@ void NNClassifier::back_prop_saved(Cost& cost, vector<int> & features_seen)
 
 void NNClassifier::add_l2_regularization(Cost& cost)
 {
+    // cerr << "regularize W1" << endl;
     for (int i = 0; i < W1.nrows(); ++i)
     {
         for (int j = 0; j < W1.ncols(); ++j)
@@ -674,12 +677,14 @@ void NNClassifier::add_l2_regularization(Cost& cost)
     }
 
     // whether regularize the bias term b1?
+    // cerr << "regularize b1" << endl;
     for (int i = 0; i < b1.size(); ++i)
     {
         cost.loss += config.reg_parameter * b1[i] * b1[i] / 2.0;
         cost.grad_b1[i] += config.reg_parameter * b1[i];
     }
 
+    // cerr << "regularize W2" << endl;
     for (int i = 0; i < W2.nrows(); ++i)
     {
         for (int j = 0; j < W2.ncols(); ++j)
@@ -694,6 +699,7 @@ void NNClassifier::add_l2_regularization(Cost& cost)
         }
     }
 
+    // cerr << "regularize Eb" << endl;
     for (int i = 0; i < Eb.nrows(); ++i)
     {
         for (int j = 0; j < Eb.ncols(); ++j)
@@ -706,6 +712,8 @@ void NNClassifier::add_l2_regularization(Cost& cost)
                         * Eb[i][j];
         }
     }
+
+    // cerr << "regularize Ed" << endl;
     for (int i = 0; i < Ed.nrows(); ++i)
     {
         for (int j = 0; j < Ed.ncols(); ++j)
@@ -718,6 +726,7 @@ void NNClassifier::add_l2_regularization(Cost& cost)
                         * Ed[i][j];
         }
     }
+    // cerr << "regularize Ev" << endl;
     for (int i = 0; i < Ev.nrows(); ++i)
     {
         for (int j = 0; j < Ev.ncols(); ++j)
@@ -730,6 +739,7 @@ void NNClassifier::add_l2_regularization(Cost& cost)
                         * Ev[i][j];
         }
     }
+    // cerr << "regularize Ec" << endl;
     for (int i = 0; i < Ec.nrows(); ++i)
     {
         for (int j = 0; j < Ec.ncols(); ++j)
@@ -1258,6 +1268,8 @@ void NNClassifier::pre_compute(
         vector<int>& candidates,
         bool refill)
 {
+    cerr << "pre_map.size = " << pre_map.size() << endl;
+    cerr << "candidates.size = " << candidates.size() << endl;
     if (refill)
         for (size_t i = 0; i < candidates.size(); ++i)
             pre_map[candidates[i]] = i;
@@ -1268,7 +1280,7 @@ void NNClassifier::pre_compute(
         for (int j = 0; j < saved.ncols(); ++j)
             saved[i][j] = 0.0;
 
-    #pragma omp parallel for
+    // #pragma omp parallel for
     for (size_t i = 0; i < candidates.size(); ++i)
     {
         int map_x = pre_map[candidates[i]];

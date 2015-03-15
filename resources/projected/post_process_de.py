@@ -47,6 +47,7 @@ def find_most_similar(w, thresh):
     ed = defaultdict(list)
     for wd,e in fo_embeddings.items():
         # if w[:2] != wd[:2]: continue # prefix constraint
+        if abs(len(wd) - len(w)) > thresh: continue
         d = eval(w, wd)
         if d > thresh: continue
         ed[d].append(wd)
@@ -59,9 +60,12 @@ def find_most_similar(w, thresh):
 cache = {}
 # cache["l'"] = en_embeddings["the"]
 
-for l in open(sys.argv[1]):
+for k, l in enumerate(open(sys.argv[1])):
     l = l.strip().split()
     if len(l) < 2: continue
+
+    if k % 100 == 0:
+        print >> sys.stderr, "[%d]" % (k)
 
     word = l[1].lower()
     if word in cache: continue

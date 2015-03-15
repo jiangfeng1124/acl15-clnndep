@@ -283,7 +283,7 @@ void DependencyParser::finetune(
 
     Dataset dataset = gen_train_samples(train_sents, train_trees);
     // classifier = new NNClassifier(config, dataset, Eb, Ed, Ev, Ec, W1, b1, W2, pre_computed_ids);
-    if (classifier) delete classifier;
+    // if (classifier) delete classifier;
     classifier->set_dataset(dataset, pre_computed_ids);
     config.print_info();
 
@@ -302,7 +302,7 @@ void DependencyParser::finetune(
 
         classifier->take_ada_gradient_step(known_words.size() - 3);
     }
-    save_model(string(model_file) + ".finetuned");
+    save_model(string(model_file) + ".finetuned." + to_str(config.finetune_iter));
 }
 
 void DependencyParser::finetune(
@@ -912,6 +912,7 @@ Dataset DependencyParser::gen_train_samples(
     cerr << "sort tokpos_count" << endl;
     sort(temp.begin(), temp.end(), Util::comp_by_value_descending<int, int>);
 
+    pre_computed_ids.clear();
     cerr << "fill pre_computed_ids" << endl;
     int real_size = min((int)temp.size(), config.num_pre_computed);
     for (int i = 0; i < real_size; ++i)
