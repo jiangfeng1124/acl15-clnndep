@@ -17,6 +17,8 @@ class ParsingSystem
 
         int get_transition_id(const std::string & s);
 
+        void set_language(const std::string & s);
+
         void evaluate(
                 std::vector<DependencySent>& sents,
                 std::vector<DependencyTree>& pred_trees,

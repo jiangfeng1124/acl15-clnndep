@@ -36,12 +36,14 @@ class DependencyParser
 
         void finetune(
                 const char * train_file, // target language
+                const char * premodel_file,
                 const char * model_file,
                 const char * emb_file,
                 int sub_sampling = -1);
 
         void finetune(
                 std::string & train_file, // target language
+                std::string & premodel_file,
                 std::string & model_file,
                 std::string & emb_file,
                 int sub_sampling = -1);
@@ -87,8 +89,8 @@ class DependencyParser
         void save_model(const char * filename);
         void save_model(const std::string & filename);
 
-        void load_model(const char * filename);
-        void load_model(const std::string & filename);
+        void load_model(const char * filename, bool re_precompute = false);
+        void load_model(const std::string & filename, bool re_precompute = false);
 
         void load_model_cl(const char * filename, const char * clemb);
         void load_model_cl(

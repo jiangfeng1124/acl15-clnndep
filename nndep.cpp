@@ -187,6 +187,7 @@ int main(int argc, char** argv)
     if (opt.is_finetune) // note: for cross-lingual learning
     {
         parser.finetune(opt.train_file,
+                opt.premodel_file,
                 opt.model_file,
                 opt.emb_file,
                 opt.sub_sampling);
@@ -196,9 +197,10 @@ int main(int argc, char** argv)
     if (opt.is_test)
     {
         if (! loaded)
-            parser.load_model(opt.model_file);
+            parser.load_model(opt.model_file, true);
         parser.test(opt.test_file,
-                opt.output_file);
+                opt.output_file,
+                true);
         // parser.save_model("tmp");
     }
 

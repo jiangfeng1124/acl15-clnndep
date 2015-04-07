@@ -73,6 +73,8 @@ void Config::init()
     cluster_embedding_size  = 50;
 
     use_postag              = true;
+
+    language                = "english";
 }
 
 void Config::set_properties(const char * filename)
@@ -147,6 +149,9 @@ void Config::set_properties(const char * filename)
     cfg_set_boolean(props, "use_valency",           use_valency);
     cfg_set_boolean(props, "use_cluster",           use_cluster);
     // cfg_set_boolean(props, "use_postag",            use_postag);
+
+    if (props.find("language") != props.end())
+        language = props["language"];
 
     if (delexicalized) num_word_tokens = 0;
     if (!labeled) num_label_tokens = 0;

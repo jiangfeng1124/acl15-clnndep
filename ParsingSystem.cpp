@@ -1,4 +1,5 @@
 #include "ParsingSystem.h"
+#include "strutils.h"
 
 #include <iostream>
 
@@ -20,7 +21,9 @@ int ParsingSystem::get_transition_id(const string & s)
 set<string> ParsingSystem::get_punctuation_tags()
 {
     string en_punc_tags[] = {"``", "''", ".", ",", ":"};
-    string zh_punc_tags[] = {"PU"};
+    string zh_punc_tags[] = {"PU"}; // modify it according to the treebanks.
+
+    cerr << "Language = " << lang << endl;
 
     if (lang == "english")
     {
@@ -76,6 +79,11 @@ set<string> ParsingSystem::get_udt_sub_obj_relations()
             udt_sub_obj_relations +
                 sizeof(udt_sub_obj_relations) / sizeof(udt_sub_obj_relations[0]));
     return sub_obj_relations_set;
+}
+
+void ParsingSystem::set_language(const string & s)
+{
+    lang = str_tolower(s);
 }
 
 void ParsingSystem::evaluate(

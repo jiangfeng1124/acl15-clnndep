@@ -5,12 +5,12 @@
 #include <vector>
 using namespace std;
 
-ArcStandard::ArcStandard(vector<string>& ldict, bool is_labeled)
+ArcStandard::ArcStandard(vector<string>& ldict, string& language, bool is_labeled)
 {
-    lang = "english"; // hardcode, TODO
+    lang = language; // hardcode, TODO
 
-    eval_corpora = "conllx"; // conllx || udt
-    eval_lang = "german"; // for cross-lingual testing: german || spanish
+    eval_corpora = "udt"; // conllx || udt
+    eval_lang = "english"; // for cross-lingual testing: german || spanish
 
     labeled = is_labeled;
 

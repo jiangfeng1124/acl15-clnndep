@@ -103,7 +103,7 @@ void DependencyParser::train(
     vector<string> ldict = known_labels;
     if (config.labeled)
         ldict.pop_back(); // remove the NIL label
-    system = new ArcStandard(ldict, config.labeled);
+    system = new ArcStandard(ldict, config.language, config.labeled);
 
     cerr << "Setup classifier for training" << endl;
     setup_classifier_for_training(train_sents, train_trees, embed_file);
@@ -390,7 +390,7 @@ void DependencyParser::collect_dynamic_features(
 
     vector<string> ldict = known_labels;
     ldict.pop_back();
-    ParsingSystem * monitor = new ArcStandard(ldict, config.labeled);
+    ParsingSystem * monitor = new ArcStandard(ldict, config.language, config.labeled);
 
     for (size_t i = 0; i < sents.size(); ++i)
     {
@@ -1420,7 +1420,7 @@ void DependencyParser::load_model(const char * filename)
         ldict.pop_back(); // remove the NIL label
 
     // know why I feel confused before?
-    system = new ArcStandard(ldict, config.labeled);
+    system = new ArcStandard(ldict, config.language, config.labeled);
 
     if (config.num_pre_computed > 0)
         classifier->pre_compute();
@@ -1699,7 +1699,7 @@ void DependencyParser::load_model_cl(
     vector<string> ldict = known_labels;
     if (config.labeled)
         ldict.pop_back(); // remove the NIL label
-    system = new ArcStandard(ldict, config.labeled);
+    system = new ArcStandard(ldict, config.language, config.labeled);
 
     /*
     if (config.num_pre_computed > 0)

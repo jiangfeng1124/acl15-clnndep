@@ -1,6 +1,6 @@
 CC = g++
 
-CFLAGS = -O3 -std=c++11 -DNDEBUG -I utils/ -Wall -funroll-loops
+CFLAGS = -O3 -std=c++11 -I utils/ -Wall -funroll-loops
 LDFLAGS = -pthread -lm
 
 EIGEN_CFLAGS = -DEIGEN_NO_DEBUG -DEIGEN_USE_MKL_ALL \

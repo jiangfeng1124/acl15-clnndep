@@ -1258,7 +1258,8 @@ void NNClassifier::pre_compute()
 {
     // TODO
     vector<int> candidates;
-    unordered_map<int, int>::iterator iter = pre_map.begin();
+    // unordered_map<int, int>::iterator iter = pre_map.begin();
+    auto iter = pre_map.begin();
     for (; iter != pre_map.end(); ++iter)
         candidates.push_back(iter->first);
     pre_compute(candidates);
@@ -1290,6 +1291,8 @@ void NNClassifier::pre_compute(
         int offset = config.get_offset(pos);
         int emb_size = config.get_embedding_size(feat_type);
 
+        // cerr << "\ri = " << i << ": " << candidates[i] << ". map_x = " << map_x << ". tok = " << tok << ". pos = " << pos;
+
         int E_index = tok;
         assert (feat_type != Config::NONEXIST);
         if (feat_type == Config::DIST_FEAT)
@@ -1298,6 +1301,8 @@ void NNClassifier::pre_compute(
             E_index -= Eb.nrows() + Ed.nrows();
         else if (feat_type == Config::CLUSTER_FEAT)
             E_index -= Eb.nrows() + Ed.nrows() + Ev.nrows();
+
+        // cerr << ". E_index = " << E_index;
 
         for (int j = 0; j < config.hidden_size; ++j)
         {

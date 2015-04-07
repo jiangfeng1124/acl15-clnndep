@@ -85,12 +85,16 @@ void DependencyParser::train(
     Util::load_conll_file(train_file, train_sents, train_trees, config.labeled);
     if (sub_sampling != -1 && (unsigned)sub_sampling < train_sents.size())
     {
-        vector<DependencySent>::const_iterator s_beg = train_sents.begin();
-        vector<DependencySent>::const_iterator s_end = train_sents.begin() + sub_sampling;
+        // vector<DependencySent>::const_iterator s_beg = train_sents.begin();
+        // vector<DependencySent>::const_iterator s_end = train_sents.begin() + sub_sampling;
+        auto s_beg = train_sents.begin();
+        auto s_end = train_sents.begin() + sub_sampling;
         train_sents = vector<DependencySent>(s_beg, s_end);
 
-        vector<DependencyTree>::const_iterator t_beg = train_trees.begin();
-        vector<DependencyTree>::const_iterator t_end = train_trees.begin() + sub_sampling;
+        // vector<DependencyTree>::const_iterator t_beg = train_trees.begin();
+        // vector<DependencyTree>::const_iterator t_end = train_trees.begin() + sub_sampling;
+        auto t_beg = train_trees.begin();
+        auto t_end = train_trees.begin() + sub_sampling;
         train_trees = vector<DependencyTree>(t_beg, t_end);
     }
     cerr << "Sub-sampling " << sub_sampling << " sentences/trees for training." << endl;
@@ -121,7 +125,7 @@ void DependencyParser::train(
     // TODO
     vector<string> ldict = known_labels;
     if (config.labeled) ldict.pop_back(); // remove the NIL label
-    system = new ArcStandard(ldict, config.labeled);
+    system = new ArcStandard(ldict, config.language, config.labeled);
 
     cerr << "Setup classifier for training" << endl;
     setup_classifier_for_training(train_sents, train_trees, embed_file, premodel_file);
@@ -236,6 +240,7 @@ void DependencyParser::train(
 
 void DependencyParser::finetune(
                 const char * train_file, // target language
+                const char * premodel_file,
                 const char * model_file,
                 const char * emb_file,
                 int sub_sampling)
@@ -245,7 +250,7 @@ void DependencyParser::finetune(
     if (n_threads > 1)
         cerr << "Using " << n_threads << " threads" << endl;
 
-    cerr << "Finetuning model:      " << model_file << endl;
+    cerr << "Finetuning model:      " << premodel_file << endl;
     cerr << "Training file:         " << train_file << endl;
     cerr << "Target embedding file: " << emb_file   << endl;
 
@@ -257,12 +262,16 @@ void DependencyParser::finetune(
     Util::load_conll_file(train_file, train_sents, train_trees, config.labeled);
     if (sub_sampling != -1 && (unsigned)sub_sampling < train_sents.size())
     {
-        vector<DependencySent>::const_iterator s_beg = train_sents.begin();
-        vector<DependencySent>::const_iterator s_end = train_sents.begin() + sub_sampling;
+        // vector<DependencySent>::const_iterator s_beg = train_sents.begin();
+        // vector<DependencySent>::const_iterator s_end = train_sents.begin() + sub_sampling;
+        auto s_beg = train_sents.begin();
+        auto s_end = train_sents.begin() + sub_sampling;
         train_sents = vector<DependencySent>(s_beg, s_end);
 
-        vector<DependencyTree>::const_iterator t_beg = train_trees.begin();
-        vector<DependencyTree>::const_iterator t_end = train_trees.begin() + sub_sampling;
+        // vector<DependencyTree>::const_iterator t_beg = train_trees.begin();
+        // vector<DependencyTree>::const_iterator t_end = train_trees.begin() + sub_sampling;
+        auto t_beg = train_trees.begin();
+        auto t_end = train_trees.begin() + sub_sampling;
         train_trees = vector<DependencyTree>(t_beg, t_end);
     }
 
@@ -279,7 +288,8 @@ void DependencyParser::finetune(
     //
     // Besides, fix_word_embeddings should be true
     cerr << "Load model trained from source language." << endl;
-    load_model_cl(model_file, emb_file);
+    if (config.delexicalized)   load_model(premodel_file);
+    else                        load_model_cl(premodel_file, emb_file);
 
     Dataset dataset = gen_train_samples(train_sents, train_trees);
     // classifier = new NNClassifier(config, dataset, Eb, Ed, Ev, Ec, W1, b1, W2, pre_computed_ids);
@@ -303,18 +313,23 @@ void DependencyParser::finetune(
         classifier->take_ada_gradient_step(known_words.size() - 3);
     }
 
-    string finetuned_model_path = string(model_file) + ".finetuned." + to_str(sub_sampling);
-    cerr << "Saved model to " << finetuned_model_path << endl;
-    save_model(finetuned_model_path);
+    // string finetuned_model_path = string(model_file) + ".finetuned." + to_str(sub_sampling);
+    cerr << "Saved model to " << model_file << endl;
+    save_model(model_file);
 }
 
 void DependencyParser::finetune(
                 std::string & train_file, // target language
+                std::string & premodel_file,
                 std::string & model_file,
                 std::string & emb_file,
                 int sub_sampling)
 {
-    finetune(train_file.c_str(), model_file.c_str(), emb_file.c_str(), sub_sampling);
+    finetune(train_file.c_str(),
+             premodel_file.c_str(),
+             model_file.c_str(),
+             emb_file.c_str(),
+             sub_sampling);
 }
 
 void DependencyParser::gen_dictionaries(
@@ -498,7 +513,7 @@ void DependencyParser::collect_dynamic_features(
 
     vector<string> ldict = known_labels;
     ldict.pop_back();
-    ParsingSystem * monitor = new ArcStandard(ldict, config.labeled);
+    ParsingSystem * monitor = new ArcStandard(ldict, config.language, config.labeled);
 
     for (size_t i = 0; i < sents.size(); ++i)
     {
@@ -1277,15 +1292,33 @@ int DependencyParser::get_word_id(const string & s)
 {
     // if fix_word_embeddings, then ignore cases
     string sl = s; // lower case form of s (if necessary)
+    // when is it necessary to convert_to_lower_case
     // if (config.fix_word_embeddings)
     //     sl = str_tolower(sl);
 
     // adapt to `delexicalized`, introduce Config::NONEXIST
+    /*
     return (word_ids.find(sl) == word_ids.end())
                 ? ((word_ids.find(Config::UNKNOWN) == word_ids.end())
                         ? Config::NONEXIST
                         : word_ids[Config::UNKNOWN])
                 : word_ids[sl];
+    */
+    if (word_ids.find(sl) == word_ids.end())
+    {
+        // sl = str_tolower(sl);
+        if (word_ids.find(sl) == word_ids.end())
+            return word_ids[sl];
+        else
+        {
+            if (word_ids.find(Config::UNKNOWN) == word_ids.end())
+                return Config::NONEXIST;
+            else
+                return word_ids[Config::UNKNOWN];
+        }
+    }
+    else
+        return word_ids[sl];
 }
 
 int DependencyParser::get_pos_id(const string & s)
@@ -1384,7 +1417,7 @@ void DependencyParser::predict(
     // return result;
 }
 
-void DependencyParser::load_model(const char * filename)
+void DependencyParser::load_model(const char * filename, bool re_precompute)
 {
     cerr << "Loading depparse model from " << filename << endl;
 
@@ -1623,22 +1656,26 @@ void DependencyParser::load_model(const char * filename)
     }
 
     input.close();
-    classifier = new NNClassifier(config, Eb, Ed, Ev, Ec, W1, b1, W2, pre_computed_ids);
+    if (re_precompute)
+        classifier = new NNClassifier(config, Eb, Ed, Ev, Ec, W1, b1, W2, vector<int>());
+    else
+        classifier = new NNClassifier(config, Eb, Ed, Ev, Ec, W1, b1, W2, pre_computed_ids);
+
     vector<string> ldict = known_labels;
     if (config.labeled)
         ldict.pop_back(); // remove the NIL label
-    system = new ArcStandard(ldict, config.labeled); // know why I feel confused before?
+    system = new ArcStandard(ldict, config.language, config.labeled);
 
-    if (config.num_pre_computed > 0)
+    if (!re_precompute && config.num_pre_computed > 0)
         classifier->pre_compute();
 
     double end = get_time();
     cerr << "Elapsed " << (end - start) << "s\n";
 }
 
-void DependencyParser::load_model(const string & filename)
+void DependencyParser::load_model(const string & filename, bool re_precompute)
 {
-    load_model(filename.c_str());
+    load_model(filename.c_str(), re_precompute);
 }
 
 /**
@@ -1752,13 +1789,14 @@ void DependencyParser::load_model_cl(
     Mat<double> Ev(Ev_entries, Ev_size);
     Mat<double> Ec(Ec_entries, Ec_size);
 
-    unordered_map<string, int>::iterator iter = embed_ids.begin();
+    // unordered_map<string, int>::iterator iter = embed_ids.begin();
+    auto iter = embed_ids.begin();
     for (; iter != embed_ids.end(); ++iter)
     {
         string word = iter->first;
         known_words.push_back(word);
 
-        assert (embedding.ncols() == Eb_size);
+        assert (embeddings.ncols() == Eb_size);
         for (int j = 0; j < Eb_size; ++j)
             Eb[index][j] = embeddings[iter->second][j];
         index += 1;
@@ -1775,6 +1813,7 @@ void DependencyParser::load_model_cl(
         vector<string> sep = split(s);
 
         assert (sep.size() == Eb_size + 1);
+        assert (config.embedding_size == Eb_size + 1);
         if (sep[0] == Config::UNKNOWN
                 || sep[0] == Config::ROOT
                 || sep[0] == Config::NIL)
@@ -1827,6 +1866,7 @@ void DependencyParser::load_model_cl(
             known_distances.push_back(to_int(sep[0]));
 
             assert (sep.size() == Ed_size + 1);
+            assert (config.distance_embedding_size == Ed_size + 1);
             for (int j = 0; j < Ed_size; ++j)
                 Ed[index][j] = to_double_sci(sep[j+1]);
             index += 1;
@@ -1841,6 +1881,7 @@ void DependencyParser::load_model_cl(
             known_valencies.push_back(sep[0]);
 
             assert (sep.size() == Ev_size + 1);
+            assert (config.valency_embedding_size == Ec_size + 1);
             for (int j = 0; j < Ev_size; ++j)
                 Ev[index][j] = to_double_sci(sep[j+1]);
             index += 1;
@@ -1855,6 +1896,7 @@ void DependencyParser::load_model_cl(
             known_clusters.push_back(sep[0]);
 
             assert (sep.size() == Ec_size + 1);
+            assert (config.cluster_embedding_size == (Ec_size + 1));
             /*
             if (sep[0] == Config::UNKNOWN)
                 for (int j = 0; j < Ec_size; ++j)
@@ -1919,7 +1961,7 @@ void DependencyParser::load_model_cl(
     vector<string> ldict = known_labels;
     if (config.labeled)
         ldict.pop_back(); // remove the NIL label
-    system = new ArcStandard(ldict, config.labeled);
+    system = new ArcStandard(ldict, config.language, config.labeled);
 
     /*
     if (config.num_pre_computed > 0)

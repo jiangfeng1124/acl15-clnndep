@@ -505,7 +505,7 @@ inline void clean(std::string &str) {
 }
 
 // convert string to lower case
-inline std::string str_tolower(std::string& str)
+inline std::string str_tolower(const std::string& str)
 {
     std::string lc_str = "";
     for (size_t i = 0; i < str.length(); ++i)

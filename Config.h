@@ -117,6 +117,8 @@ class Config
          */
         bool use_postag;
 
+        std::string language;
+
     public:
         Config();
         Config(const char * filename);
