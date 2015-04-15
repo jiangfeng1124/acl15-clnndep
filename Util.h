@@ -316,12 +316,34 @@ class Util
         }
 
         template <typename T>
+        static Mat3<T> mat3_subtract(const Mat3<T> & mat1, const Mat3<T> & mat2)
+        {
+            Mat3<T> result(mat1.dim1(), mat1.dim2(), mat1.dim3());
+            for (int i = 0; i < mat1.dim1(); ++i)
+                for (int j = 0; j < mat1.dim2(); ++j)
+                    for (int k = 0; k < mat1.dim3(); ++k)
+                        result[i][j][k] = mat1[i][j][k] - mat2[i][j][k];
+            return result;
+        }
+
+        template <typename T>
         static Mat<T> mat_add(const Mat<T> & mat1, const Mat<T> & mat2)
         {
             Mat<T> result(mat1.nrows(), mat1.ncols());
             for (int i = 0; i < mat1.nrows(); ++i)
                 for (int j = 0; j < mat1.ncols(); ++j)
                     result[i][j] = mat1[i][j] + mat2[i][j];
+            return result;
+        }
+
+        template <typename T>
+        static Mat3<T> mat3_add(const Mat3<T> & mat1, const Mat3<T> & mat2)
+        {
+            Mat3<T> result(mat1.dim1(), mat1.dim2(), mat1.dim3());
+            for (int i = 0; i < mat1.dim1(); ++i)
+                for (int j = 0; j < mat1.dim2(); ++j)
+                    for (int k = 0; k < mat1.dim3(); ++k)
+                        result[i][j][k] = mat1[i][j][k] + mat2[i][j][k];
             return result;
         }
 
@@ -359,12 +381,32 @@ class Util
         }
 
         template <typename T>
+        static void mat3_inc(Mat3<T> & mat1, const Mat3<T> & mat2)
+        {
+            for (int i = 0; i < mat1.dim1(); ++i)
+                for (int j = 0; j < mat1.dim2(); ++j)
+                    for (int k = 0; k < mat1.dim3(); ++k)
+                        mat1[i][j][k] += mat2[i][j][k];
+        }
+
+        template <typename T>
         static double l2_norm(const Mat<T> & mat)
         {
             double result = 0.0;
             for (int i = 0; i < mat.nrows(); ++i)
                 for (int j = 0; j < mat.ncols(); ++j)
                     result += mat[i][j] * mat[i][j];
+            return sqrt(result);
+        }
+
+        template <typename T>
+        static double l2_norm(const Mat3<T> & mat)
+        {
+            double result = 0.0;
+            for (int i = 0; i < mat.dim1(); ++i)
+                for (int j = 0; j < mat.dim2(); ++j)
+                    for (int k = 0; k < mat.dim3(); ++k)
+                        result += mat[i][j][k] * mat[i][j][k];
             return sqrt(result);
         }
 

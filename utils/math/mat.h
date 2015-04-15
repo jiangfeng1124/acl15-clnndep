@@ -323,6 +323,56 @@ public:
         return *this;
     }
 
+    Mat3(const T & a, const int n, const int m, const int k)
+        : nn(0), mm(0), kk(0), tot_sz(0), v(0) {
+        resize(n, m, k);
+        for (int i = 0; i < n; ++ i) {
+            for (int j = 0; j < m; ++ j) {
+                for (int l = 0; l < k; ++ l) {
+                    v[i][j][l] = a;
+                }
+            }
+        }
+    }
+
+    Mat3(const T * a, const int n, const int m, const int k) {
+        resize(n, m, k);
+        for (int i = 0; i < n; ++ i) {
+            for (int j = 0; j < m; ++ j) {
+                for (int l = 0; l < k; ++ l) {
+                    v[i][j][l] = *a;
+                    ++ a;
+                }
+            }
+        }
+    }
+
+    Mat3(const Mat3 & rhs) {
+        resize(rhs.nn, rhs.mm, rhs.kk);
+        for (int i = 0; i < nn; ++ i) {
+            for (int j = 0; j < mm; ++ j) {
+                for (int l = 0; l < kk; ++ l) {
+                    v[i][j][l] = rhs[i][j][l];
+                }
+            }
+        }
+    }
+
+    Mat3 & operator= (const Mat3 &rhs) {
+        if (this != &rhs) {
+            resize(rhs.nn, rhs.mm, rhs.kk);
+
+            for (int i = 0; i < nn; ++ i) {
+                for (int j = 0; j < mm; ++ j) {
+                    for (int l = 0; l < kk; ++ l) {
+                        v[i][j][l] = rhs[i][j][l];
+                    }
+                }
+            }
+        }
+        return *this;
+    }
+
     Mat3 & operator= (const T &a) {
         for (int i = 0; i < nn; ++ i) {
             for (int j = 0; j < mm; ++ j) {

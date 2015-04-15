@@ -114,7 +114,7 @@ class Cost
             dropout_histories = _dropout_histories;
         }
 
-        void merge(const Cost & c, bool debug = false);
+        void merge(const Cost & c, bool & debug);
 
         double get_loss()
         {
@@ -154,7 +154,7 @@ class Cost
         }
         Mat<double> get_grad_Wv()
         {
-            return grad_wv;
+            return grad_Wv;
         }
         Mat3<double> get_grad_Wr()
         {
@@ -326,8 +326,6 @@ class NNClassifier
 
         std::vector<Sample> samples; // a mini-batch
         // std::vector< std::vector<int> > dropout_histories;
-
-        bool debug; // for gradient_checking
 
         int cursor; // for sampling minibatch
 

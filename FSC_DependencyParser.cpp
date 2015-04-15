@@ -134,12 +134,14 @@ void DependencyParser::train(
     /**
      * Gradient Check
      */
-    // classifier->check_gradient();
-    // classifier->check_gradient();
+    if (config.debug)
+    {
+        classifier->check_gradient();
+        save_model(string(model_file)); // can rename
+        return ;
+    }
 
     save_model(string(model_file)); // can rename
-
-    // return ;
 
     double best_uas = -DBL_MAX;
     for (int iter = 0; iter < config.max_iter; ++iter)
@@ -1098,6 +1100,8 @@ void DependencyParser::save_model(const char * filename)
     Mat<double>& Ed = classifier->get_Ed();
     Mat<double>& Ev = classifier->get_Ev();
     Mat<double>& Ec = classifier->get_Ec();
+    Mat<double>& Wv = classifier->get_Wv();
+    Mat3<double>& Wr = classifier->get_Wr();
 
     ofstream output(filename);
     output << "dict="                   << known_words.size()               << "\n"
@@ -1212,7 +1216,7 @@ void DependencyParser::save_model(const char * filename)
         for (int l = 0; l < Wr.dim3(); ++l)
         {
             output << Wr[i][0][l];
-            for (int j = 0; j < Wr.dim2(); ++j)
+            for (int j = 1; j < Wr.dim2(); ++j)
                 output << " " << Wr[i][j][l];
             output << "\n";
         }
@@ -1550,7 +1554,7 @@ void DependencyParser::load_model(const char * filename, bool re_precompute)
             vector<string> sep = split(s);
             known_words.push_back(sep[0]);
 
-            assert (sep.size() == Eb_size + 1);
+            assert (sep.size() == (unsigned)Eb_size + 1);
             for (int j = 0; j < Eb_size; ++j)
                 Eb[index][j] = to_double_sci(sep[j+1]);
             index += 1;
@@ -1563,7 +1567,7 @@ void DependencyParser::load_model(const char * filename, bool re_precompute)
             vector<string> sep = split(s);
             known_poss.push_back(sep[0]);
 
-            assert (sep.size() == Eb_size + 1);
+            assert (sep.size() == (unsigned)Eb_size + 1);
             for (int j = 0; j < Eb_size; ++j)
                 Eb[index][j] = to_double_sci(sep[j+1]);
             index += 1;
@@ -1576,7 +1580,7 @@ void DependencyParser::load_model(const char * filename, bool re_precompute)
             vector<string> sep = split(s);
             known_labels.push_back(sep[0]);
 
-            assert (sep.size() == Eb_size + 1);
+            assert (sep.size() == (unsigned)Eb_size + 1);
             for (int j = 0; j < Eb_size; ++j)
                 Eb[index][j] = to_double_sci(sep[j+1]);
             index += 1;
@@ -1594,7 +1598,7 @@ void DependencyParser::load_model(const char * filename, bool re_precompute)
             vector<string> sep = split(s);
             known_distances.push_back(to_int(sep[0]));
 
-            assert (sep.size() == Ed_size + 1);
+            assert (sep.size() == (unsigned)Ed_size + 1);
             for (int j = 0; j < Ed_size; ++j)
                 Ed[index][j] = to_double_sci(sep[j+1]);
             index += 1;
@@ -1608,7 +1612,7 @@ void DependencyParser::load_model(const char * filename, bool re_precompute)
             vector<string> sep = split(s);
             known_valencies.push_back(sep[0]);
 
-            assert (sep.size() == Ev_size + 1);
+            assert (sep.size() == (unsigned)Ev_size + 1);
             for (int j = 0; j < Ev_size; ++j)
                 Ev[index][j] = to_double_sci(sep[j+1]);
             index += 1;
@@ -1622,7 +1626,7 @@ void DependencyParser::load_model(const char * filename, bool re_precompute)
             vector<string> sep = split(s);
             known_clusters.push_back(sep[0]);
 
-            assert (sep.size() == Ec_size + 1);
+            assert (sep.size() == (unsigned)Ec_size + 1);
             for (int j = 0; j < Ec_size; ++j)
                 Ec[index][j] = to_double_sci(sep[j+1]);
             index += 1;
@@ -1641,7 +1645,7 @@ void DependencyParser::load_model(const char * filename, bool re_precompute)
         getline(input, s);
         vector<string> sep = split(s);
 
-        assert (sep.size() == h_size);
+        assert (sep.size() == (unsigned)h_size);
         for (int i = 0; i < W1.nrows(); ++i)
             W1[i][j] = to_double_sci(sep[i]);
     }
@@ -1649,7 +1653,7 @@ void DependencyParser::load_model(const char * filename, bool re_precompute)
     Vec<double> b1(h_size);
     getline(input, s);
     vector<string> sep = split(s);
-    assert (sep.size() == h_size);
+    assert (sep.size() == (unsigned)h_size);
     for (int i = 0; i < b1.size(); ++i)
     {
         b1[i] = to_double_sci(sep[i]);
@@ -1661,7 +1665,7 @@ void DependencyParser::load_model(const char * filename, bool re_precompute)
     {
         getline(input, s);
         vector<string> sep = split(s);
-        assert (sep.size() == n_actions);
+        assert (sep.size() == (unsigned)n_actions);
         for (int i = 0; i < W2.nrows(); ++i)
             W2[i][j] = to_double_sci(sep[i]);
     }
@@ -1808,7 +1812,7 @@ void DependencyParser::load_model_cl(
         getline(input, s);
         vector<string> sep = split(s);
 
-        assert (sep.size() == Eb_size + 1);
+        assert (sep.size() == (unsigned)Eb_size + 1);
         assert (config.embedding_size == Eb_size + 1);
         if (sep[0] == Config::UNKNOWN
                 || sep[0] == Config::ROOT
@@ -1831,7 +1835,7 @@ void DependencyParser::load_model_cl(
             vector<string> sep = split(s);
             known_poss.push_back(sep[0]);
 
-            assert (sep.size() == Eb_size + 1);
+            assert (sep.size() == (unsigned)Eb_size + 1);
             for (int j = 0; j < Eb_size; ++j)
                 Eb[index][j] = to_double_sci(sep[j+1]);
             index += 1;
@@ -1843,7 +1847,7 @@ void DependencyParser::load_model_cl(
             vector<string> sep = split(s);
             known_labels.push_back(sep[0]);
 
-            assert (sep.size() == Eb_size + 1);
+            assert (sep.size() == (unsigned)Eb_size + 1);
             for (int j = 0; j < Eb_size; ++j)
                 Eb[index][j] = to_double_sci(sep[j+1]);
             index += 1;
@@ -1861,7 +1865,7 @@ void DependencyParser::load_model_cl(
             vector<string> sep = split(s);
             known_distances.push_back(to_int(sep[0]));
 
-            assert (sep.size() == Ed_size + 1);
+            assert (sep.size() == (unsigned)Ed_size + 1);
             assert (config.distance_embedding_size == Ed_size + 1);
             for (int j = 0; j < Ed_size; ++j)
                 Ed[index][j] = to_double_sci(sep[j+1]);
@@ -1876,7 +1880,7 @@ void DependencyParser::load_model_cl(
             vector<string> sep = split(s);
             known_valencies.push_back(sep[0]);
 
-            assert (sep.size() == Ev_size + 1);
+            assert (sep.size() == (unsigned)Ev_size + 1);
             assert (config.valency_embedding_size == Ec_size + 1);
             for (int j = 0; j < Ev_size; ++j)
                 Ev[index][j] = to_double_sci(sep[j+1]);
@@ -1891,7 +1895,7 @@ void DependencyParser::load_model_cl(
             vector<string> sep = split(s);
             known_clusters.push_back(sep[0]);
 
-            assert (sep.size() == Ec_size + 1);
+            assert (sep.size() == (unsigned)Ec_size + 1);
             assert (config.cluster_embedding_size == (Ec_size + 1));
             /*
             if (sep[0] == Config::UNKNOWN)
@@ -1917,7 +1921,7 @@ void DependencyParser::load_model_cl(
         getline(input, s);
         vector<string> sep = split(s);
 
-        assert (sep.size() == h_size);
+        assert (sep.size() == (unsigned)h_size);
         for (int i = 0; i < W1.nrows(); ++i)
             W1[i][j] = to_double_sci(sep[i]);
     }
@@ -1926,7 +1930,7 @@ void DependencyParser::load_model_cl(
     getline(input, s);
     vector<string> sep = split(s);
 
-    assert (sep.size() == h_size);
+    assert (sep.size() == (unsigned)h_size);
     for (int i = 0; i < b1.size(); ++i)
     {
         b1[i] = to_double_sci(sep[i]);
@@ -1938,7 +1942,7 @@ void DependencyParser::load_model_cl(
     {
         getline(input, s);
         vector<string> sep = split(s);
-        assert (sep.size() == n_actions);
+        assert (sep.size() == (unsigned)n_actions);
         for (int i = 0; i < W2.nrows(); ++i)
             W2[i][j] = to_double_sci(sep[i]);
     }
@@ -1974,7 +1978,7 @@ void DependencyParser::load_model_cl(
     }
 
     input.close();
-    classifier = new NNClassifier(config, Eb, Ed, Ev, Ec, W1, b1, W2, vector<int>());
+    classifier = new NNClassifier(config, Eb, Ed, Ev, Ec, W1, b1, W2, Wv, Wr, vector<int>());
     vector<string> ldict = known_labels;
     if (config.labeled)
         ldict.pop_back(); // remove the NIL label

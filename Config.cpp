@@ -75,6 +75,10 @@ void Config::init()
     use_postag              = true;
 
     language                = "english";
+    num_compose_tokens      = 2;
+    compose_embedding_size  = 50;
+
+    debug                   = false;
 }
 
 void Config::set_properties(const char * filename)
@@ -133,6 +137,8 @@ void Config::set_properties(const char * filename)
     cfg_set_int(props, "distance_embedding_size",   distance_embedding_size);
     cfg_set_int(props, "valency_embedding_size",    valency_embedding_size);
     cfg_set_int(props, "cluster_embedding_size",    cluster_embedding_size);
+    cfg_set_int(props, "compose_embedding_size",    compose_embedding_size);
+    cfg_set_int(props, "num_compose_tokens",        num_compose_tokens);
 
     cfg_set_double(props, "init_range",             init_range);
     cfg_set_double(props, "ada_eps",                ada_eps);
@@ -148,6 +154,7 @@ void Config::set_properties(const char * filename)
     cfg_set_boolean(props, "use_distance",          use_distance);
     cfg_set_boolean(props, "use_valency",           use_valency);
     cfg_set_boolean(props, "use_cluster",           use_cluster);
+    cfg_set_boolean(props, "debug",                 debug);
     // cfg_set_boolean(props, "use_postag",            use_postag);
 
     if (props.find("language") != props.end())
@@ -246,6 +253,11 @@ void Config::print_info()
     cerr << "distance_embedding_size = " << distance_embedding_size << endl;
     cerr << "valency_embedding_size  = " << valency_embedding_size  << endl;
     cerr << "cluster_embedding_size  = " << cluster_embedding_size  << endl;
+
+    cerr << "num_compose_tokens      = " << num_compose_tokens      << endl;
+    cerr << "compose_embedding_size  = " << compose_embedding_size  << endl;
+
+    cerr << "debug                   = " << debug                   << endl;
 }
 
 int Config::get_embedding_size(int feat_type)
@@ -254,20 +266,15 @@ int Config::get_embedding_size(int feat_type)
     {
         case BASIC_FEAT:
             return embedding_size;
-            break;
         case DIST_FEAT:
             return distance_embedding_size;
-            break;
         case VALENCY_FEAT:
             return valency_embedding_size;
-            break;
         case CLUSTER_FEAT:
             return cluster_embedding_size;
-            break;
         default:
             cerr << "Weird!" << endl;
             return embedding_size;
-            break;
     }
 }
 

@@ -97,7 +97,7 @@ NNClassifier::NNClassifier(const NNClassifier & classifier)
     // saved = classifier.saved;
 
     num_labels = classifier.num_labels;
-    debug = classifier.debug;
+    // debug = classifier.debug;
 }
 
 NNClassifier::NNClassifier(
@@ -186,7 +186,7 @@ NNClassifier::NNClassifier(
     */
     grad_saved.resize(pre_map.size(), config.hidden_size);
 
-    debug = false;
+    // debug = true; // important when debug
 }
 
 void NNClassifier::set_dataset(
@@ -260,7 +260,7 @@ Cost NNClassifier::thread_proc(vector<Sample> & chunk, size_t batch_size)
         vector<int> active_units;
         dropout(config.hidden_size, config.dropout_prob, active_units);
 
-        if (debug)
+        if (config.debug)
             dropout_histories.push_back(active_units);
 
         // feed forward the basic feature tokens to hidden layer
@@ -344,6 +344,7 @@ Cost NNClassifier::thread_proc(vector<Sample> & chunk, size_t batch_size)
         // feed forward the composed tokens to hidden layer
         for (int j = 0; j < config.num_compose_tokens; ++j)
         {
+            // cerr << "Feed-forward the composition layers " << j << endl;
             // j = 0 | 1
             const unordered_map<string, int> tree = compose_structure[j];
 
@@ -368,17 +369,6 @@ Cost NNClassifier::thread_proc(vector<Sample> & chunk, size_t batch_size)
             int idx_l_rc2  = tok_l_rc2 - Eb_label_start;
             int idx_l_llc1 = tok_l_llc1 - Eb_label_start;
             int idx_l_rrc1 = tok_l_rrc1 - Eb_label_start;
-
-            /*
-            Vec<double> llc1_hidden(0.0, config.compose_embedding_size);
-            Vec<double> lc2_hidden(0.0, config.compose_embedding_size);
-            Vec<double> rrc1_hidden(0.0, config.compose_embedding_size);
-            Vec<double> rc2_hidden(0.0, config.compose_embedding_size);
-
-            Vec<double> lc1_hidden(0.0, config.compose_embedding_size);
-            Vec<double> rc1_hidden(0.0, config.compose_embedding_size);
-            Vec<double> root_hidden(0.0, config.compose_embedding_size);
-            */
 
             // propagate leaf nodes (embedding) to hidden layers
 
@@ -468,10 +458,12 @@ Cost NNClassifier::thread_proc(vector<Sample> & chunk, size_t batch_size)
             // cube active function
             hidden3[node_index] = pow(hidden[node_index], 3);
             // clip: not sure whether it's right
+            /*
             if (hidden3[node_index] > 50)
                 hidden3[node_index] = 50;
             if (hidden3[node_index] < -50)
                 hidden3[node_index] = -50;
+            */
         }
 
         /*
@@ -516,6 +508,7 @@ Cost NNClassifier::thread_proc(vector<Sample> & chunk, size_t batch_size)
             if (label[j] >= 0)
             {
                 scores[j] = fasterexp(scores[j] - max_score);
+                // scores[j] = exp(scores[j] - max_score);
                 if (label[j] == 1) sum1 += scores[j];
                 sum2 += scores[j];
             }
@@ -662,6 +655,9 @@ Cost NNClassifier::thread_proc(vector<Sample> & chunk, size_t batch_size)
         // Back-propagation to the composition layers
         for (int j = 0; j < config.num_compose_tokens; ++j)
         {
+            // cerr << "back-propagation to the composition layer" << endl;
+            const unordered_map<string, int> tree = compose_structure[j];
+
             int tok_w_root = features[tree.find("w_root")->second];
             int tok_w_lc1  = features[tree.find("w_lc1")->second];
             int tok_w_lc2  = features[tree.find("w_lc2")->second];
@@ -861,7 +857,7 @@ void NNClassifier::compute_cost_function()
             cost.grad_E[i][j] = 0.0;
     */
 
-    if (debug)
+    if (config.debug)
         cost.dropout_histories.clear();
 
     /**
@@ -930,7 +926,7 @@ void NNClassifier::compute_cost_function()
         if (i == 0)
             cost = results[i].get(); // R-value
         else
-            cost.merge(results[i].get(), debug);
+            cost.merge(results[i].get(), config.debug);
     }
 
     // cost = 0.0;
@@ -1354,6 +1350,8 @@ double NNClassifier::compute_cost()
 
     double v_cost = 0.0;
 
+    int Eb_label_start = Eb.nrows() - Wr.dim1(); // important
+
     // cerr << "samples.size=" << samples.size() << endl;
     // cerr << "dropout_history.size=" << cost.dropout_histories.size() << endl;
     for (size_t i = 0; i < samples.size(); ++i)
@@ -1428,6 +1426,7 @@ double NNClassifier::compute_cost()
         // feed forward the composed tokens to hidden layer
         for (int j = 0; j < config.num_compose_tokens; ++j)
         {
+            // cerr << "Feed-forward the composition layer " << j << endl;
             // j = 0 | 1
             const unordered_map<string, int> tree = compose_structure[j];
 
@@ -1453,24 +1452,8 @@ double NNClassifier::compute_cost()
             int idx_l_llc1 = tok_l_llc1 - Eb_label_start;
             int idx_l_rrc1 = tok_l_rrc1 - Eb_label_start;
 
-            /*
-            Vec<double> llc1_hidden(0.0, config.compose_embedding_size);
-            Vec<double> lc2_hidden(0.0, config.compose_embedding_size);
-            Vec<double> rrc1_hidden(0.0, config.compose_embedding_size);
-            Vec<double> rc2_hidden(0.0, config.compose_embedding_size);
-
-            Vec<double> lc1_hidden(0.0, config.compose_embedding_size);
-            Vec<double> rc1_hidden(0.0, config.compose_embedding_size);
-            Vec<double> root_hidden(0.0, config.compose_embedding_size);
-            */
-
             // propagate leaf nodes (embedding) to hidden layers
 
-            // in contrast to the cube activation function
-            //  for sigmoidal functions, we don't have to store
-            //  all hidden outputs before activation (W * x + b)
-            //  So, we can just overwrite the hidden layer to store
-            //  the activated output.
             for (int k = 0; k < config.compose_embedding_size; ++k)
             {
                 for (int l = 0; l < Eb.ncols(); ++l)
@@ -1571,6 +1554,7 @@ double NNClassifier::compute_cost()
             if (label[j] >= 0)
             {
                 scores[j] = fasterexp(scores[j] - max_score);
+                // scores[j] = exp(scores[j] - max_score);
                 // scores[j] = exp(scores[j]);
                 if (label[j] == 1) sum1 += scores[j];
                 sum2 += scores[j];
@@ -1923,6 +1907,8 @@ void NNClassifier::compute_scores(
     scores.clear();
     scores.resize(num_labels, 0.0);
 
+    int Eb_label_start = Eb.nrows() - Wr.dim1(); // important
+
     Vec<double> hidden(0.0, config.hidden_size);
     int offset = 0;
     for (size_t i = 0; i < features.size(); ++i)
@@ -2073,13 +2059,11 @@ void NNClassifier::compute_scores(
         // bias
 
         // propagate the composed root -> hidden
-        for (size_t k = 0; k < active_units.size(); ++k)
+        for (int k = 0; k < config.hidden_size; ++k)
         {
-            int node_index = active_units[k];
             for (int l = 0; l < config.compose_embedding_size; ++l)
             {
-                hidden[node_index] +=
-                    W1[node_index][offset+l] * root_hidden[j][l];
+                hidden[k] += W1[k][offset+l] * root_hidden[j][l];
             }
         }
         offset += config.compose_embedding_size;
@@ -2120,7 +2104,7 @@ void NNClassifier::finalize_training()
     // reset
 }
 
-void Cost::merge(const Cost & c, bool debug)
+void Cost::merge(const Cost & c, bool & debug)
 {
     loss += c.loss;
     percent_correct += c.percent_correct;
@@ -2149,8 +2133,8 @@ void NNClassifier::print_info()
          << "\tEb: " << Eb.nrows() << " * " << Eb.ncols() << endl
          << "\tEd: " << Ed.nrows() << " * " << Ed.ncols() << endl
          << "\tEv: " << Ev.nrows() << " * " << Ev.ncols() << endl
-         << "\tEc: " << Ec.nrows() << " * " << Ec.ncols() << endl;
-         << "\tWv: " << Wv.nrows() << " * " << Wv.ncols() << endl;
+         << "\tEc: " << Ec.nrows() << " * " << Ec.ncols() << endl
+         << "\tWv: " << Wv.nrows() << " * " << Wv.ncols() << endl
          << "\tWr: " << Wr.dim1() << " * " << Wr.dim2() << " * " << Wr.dim3() << endl;
 }
 

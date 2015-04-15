@@ -119,6 +119,14 @@ class Config
 
         std::string language;
 
+        /**
+         * compositional embedding size
+         */
+        int num_compose_tokens;
+        int compose_embedding_size;
+
+        bool debug;
+
     public:
         Config();
         Config(const char * filename);

@@ -57,7 +57,7 @@ NNClassifier::NNClassifier(const NNClassifier & classifier)
     // saved = classifier.saved;
 
     num_labels = classifier.num_labels;
-    debug = classifier.debug;
+    // debug = classifier.debug;
 }
 
 NNClassifier::NNClassifier(
@@ -138,7 +138,7 @@ NNClassifier::NNClassifier(
     */
     grad_saved.resize(pre_map.size(), config.hidden_size);
 
-    debug = false;
+    // debug = false;
 }
 
 void NNClassifier::set_dataset(
@@ -207,7 +207,7 @@ Cost NNClassifier::thread_proc(vector<Sample> & chunk, size_t batch_size)
         vector<int> active_units;
         dropout(config.hidden_size, config.dropout_prob, active_units);
 
-        if (debug)
+        if (config.debug)
             dropout_histories.push_back(active_units);
 
         // feed forward to hidden layer
@@ -335,7 +335,8 @@ Cost NNClassifier::thread_proc(vector<Sample> & chunk, size_t batch_size)
         {
             if (label[j] >= 0)
             {
-                scores[j] = fasterexp(scores[j] - max_score);
+                // scores[j] = fasterexp(scores[j] - max_score);
+                scores[j] = exp(scores[j] - max_score);
                 if (label[j] == 1) sum1 += scores[j];
                 sum2 += scores[j];
             }
@@ -377,7 +378,7 @@ Cost NNClassifier::thread_proc(vector<Sample> & chunk, size_t batch_size)
 
         for (int i = 0; i < num_labels; ++i)
         {
-            if (label[i] >= 0)
+            if (label[i] >= 0) // important
             {
                 double delta = -(label[i] - scores[i] / sum2) / batch_size;
                 for (size_t j = 0; j < active_units.size(); ++j)
@@ -515,7 +516,7 @@ void NNClassifier::compute_cost_function()
             cost.grad_E[i][j] = 0.0;
     */
 
-    if (debug)
+    if (config.debug)
         cost.dropout_histories.clear();
 
     /**
@@ -582,9 +583,9 @@ void NNClassifier::compute_cost_function()
     for (int i = 0; i < num_chunks; ++i)
     {
         if (i == 0)
-            cost = results[i].get();
+            cost = results[i].get(); // R-value
         else
-            cost.merge(results[i].get(), debug);
+            cost.merge(results[i].get(), config.debug);
     }
 
     // cost = 0.0;
@@ -1036,7 +1037,8 @@ double NNClassifier::compute_cost()
         {
             if (label[j] >= 0)
             {
-                scores[j] = fasterexp(scores[j] - max_score);
+                // scores[j] = fasterexp(scores[j] - max_score);
+                scores[j] = exp(scores[j] - max_score);
                 // scores[j] = exp(scores[j]);
                 if (label[j] == 1) sum1 += scores[j];
                 sum2 += scores[j];
@@ -1398,33 +1400,13 @@ void NNClassifier::clear_gradient_histories()
 
 void NNClassifier::init_gradient_histories()
 {
-    eg2W1.resize(W1.nrows(), W1.ncols());
-    for (int i = 0; i < eg2W1.nrows(); ++i)
-        for (int j = 0; j < eg2W1.ncols(); ++j)
-            eg2W1[i][j] = 0.0;
-    eg2W2.resize(W2.nrows(), W2.ncols());
-    for (int i = 0; i < eg2W2.nrows(); ++i)
-        for (int j = 0; j < eg2W2.ncols(); ++j)
-            eg2W2[i][j] = 0.0;
-    eg2Eb.resize(Eb.nrows(), Eb.ncols());
-    for (int i = 0; i < eg2Eb.nrows(); ++i)
-        for (int j = 0; j < eg2Eb.ncols(); ++j)
-            eg2Eb[i][j] = 0.0;
-    eg2Ed.resize(Ed.nrows(), Ed.ncols());
-    for (int i = 0; i < eg2Ed.nrows(); ++i)
-        for (int j = 0; j < eg2Ed.ncols(); ++j)
-            eg2Ed[i][j] = 0.0;
-    eg2Ev.resize(Ev.nrows(), Ev.ncols());
-    for (int i = 0; i < eg2Ev.nrows(); ++i)
-        for (int j = 0; j < eg2Ev.ncols(); ++j)
-            eg2Ev[i][j] = 0.0;
-    eg2Ec.resize(Ec.nrows(), Ec.ncols());
-    for (int i = 0; i < eg2Ec.nrows(); ++i)
-        for (int j = 0; j < eg2Ec.ncols(); ++j)
-            eg2Ec[i][j] = 0.0;
-    eg2b1.resize(b1.size());
-    for (int i = 0; i < eg2b1.size(); ++i)
-        eg2b1[i] = 0.0;
+    eg2W1.resize(W1.nrows(), W1.ncols()); eg2W1 = .0;
+    eg2W2.resize(W2.nrows(), W2.ncols()); eg2W2 = .0;
+    eg2Eb.resize(Eb.nrows(), Eb.ncols()); eg2Eb = .0;
+    eg2Ed.resize(Ed.nrows(), Ed.ncols()); eg2Ed = .0;
+    eg2Ev.resize(Ev.nrows(), Ev.ncols()); eg2Ev = .0;
+    eg2Ec.resize(Ec.nrows(), Ec.ncols()); eg2Ec = .0;
+    eg2b1.resize(b1.size()); eg2b1 = .0;
 }
 
 void NNClassifier::finalize_training()
@@ -1432,7 +1414,7 @@ void NNClassifier::finalize_training()
     // reset
 }
 
-void Cost::merge(const Cost & c, bool debug)
+void Cost::merge(const Cost & c, bool & debug)
 {
     loss += c.loss;
     percent_correct += c.percent_correct;

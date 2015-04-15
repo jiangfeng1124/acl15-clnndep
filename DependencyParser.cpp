@@ -134,12 +134,14 @@ void DependencyParser::train(
     /**
      * Gradient Check
      */
-    // classifier->check_gradient();
-    // classifier->check_gradient();
+    if (config.debug)
+    {
+        classifier->check_gradient();
+        save_model(string(model_file)); // can rename
+        return ;
+    }
 
     save_model(string(model_file)); // can rename
-
-    // return ;
 
     double best_uas = -DBL_MAX;
     for (int iter = 0; iter < config.max_iter; ++iter)

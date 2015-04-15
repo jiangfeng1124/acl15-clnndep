@@ -28,13 +28,17 @@ OBJS = Config.o Dataset.o DependencySent.o DependencyTree.o \
 OBJS_MAT = $(OBJS) Classifier.o DependencyParser.o
 OBJS_EIGEN = $(OBJS) ClassifierEigen.o DependencyParserEigen.o
 
+OBJS_FSC = $(OBJS) FSC_Classifier.o FSC_DependencyParser.o
+
 HEADERS = Config.h Dataset.h DependencySent.h DependencyTree.h \
 		  Configuration.h ParsingSystem.h ArcStandard.h Util.h \
 
 HEADERS_MAT = Classifier.h DependencyParser.h
 HEADERS_EIGEN = ClassifierEigen.h DependencyParserEigen.h
 
-all: nndep proj nndep_eigen eval
+HEADERS_FSC = FSC_Classifier.h FSC_DependencyParser.h
+
+all: nndep proj nndep_eigen nndep_fsc eval
 
 eval : eval.o $(OBJS) $(HEADERS)
 	$(CC) -o eval eval.o $(OBJS) $(CFLAGS)
@@ -48,9 +52,12 @@ nndep : nndep.o $(OBJS_MAT) $(HEADERS) $(HEADERS_MAT)
 nndep_eigen : nndep_eigen.o $(OBJS_EIGEN) $(HEADERS) $(HEADERS_EIGEN)
 	$(CC) -o nndep_eigen nndep_eigen.o $(OBJS_EIGEN) $(ALL_CFLAGS) $(ALL_LDFLAGS)
 
-clean:
-	rm -r -f $(OBJS) nndep proj nndep_eigen *.o
+nndep_fsc : nndep_fsc.o $(OBJS_FSC) $(HEADERS) $(HEADERS_FSC)
+	$(CC) -o nndep_fsc nndep_fsc.o $(OBJS_FSC) $(ALL_CFLAGS) $(ALL_LDFLAGS)
 
-.cpp.o: $(HEADERS) $(HEADERS_MAT) $(HEADERS_EIGEN)
+clean:
+	rm -r -f $(OBJS) nndep proj nndep_eigen nndep_fsc *.o
+
+.cpp.o: $(HEADERS) $(HEADERS_MAT) $(HEADERS_EIGEN) $(HEADERS_FSC)
 	$(CC) -c $(ALL_CFLAGS) $<
 
