@@ -77,6 +77,8 @@ void Config::init()
     language                = "english";
     num_compose_tokens      = 2;
     compose_embedding_size  = 50;
+    compose_weighted        = false;
+    compose_by_position     = false;
 
     debug                   = false;
 }
@@ -155,6 +157,8 @@ void Config::set_properties(const char * filename)
     cfg_set_boolean(props, "use_valency",           use_valency);
     cfg_set_boolean(props, "use_cluster",           use_cluster);
     cfg_set_boolean(props, "debug",                 debug);
+    cfg_set_boolean(props, "compose_weighted",      compose_weighted);
+    cfg_set_boolean(props, "compose_by_position",   compose_by_position);
     // cfg_set_boolean(props, "use_postag",            use_postag);
 
     if (props.find("language") != props.end())
@@ -256,6 +260,8 @@ void Config::print_info()
 
     cerr << "num_compose_tokens      = " << num_compose_tokens      << endl;
     cerr << "compose_embedding_size  = " << compose_embedding_size  << endl;
+    cerr << "compose_weighted        = " << compose_weighted        << endl;
+    cerr << "compose_by_position     = " << compose_by_position     << endl;
 
     cerr << "debug                   = " << debug                   << endl;
 }

@@ -341,6 +341,13 @@ Cost NNClassifier::thread_proc(vector<Sample> & chunk, size_t batch_size)
         Mat<double> rc1_hidden(0.0, config.num_compose_tokens, config.compose_embedding_size);
         Mat<double> root_hidden(0.0, config.num_compose_tokens, config.compose_embedding_size);
 
+        int lc1_nchild = (config.compose_weighted) ? 2 : 1;
+        double lc1_weight = 1.0 / lc1_nchild;
+        int rc1_nchild = (config.compose_weighted) ? 2 : 1;
+        double rc1_weight = 1.0 / rc1_nchild;
+        int root_nchild = (config.compose_weighted) ? 7 : 1;
+        double root_weight = 1.0 / root_nchild;
+
         // feed forward the composed tokens to hidden layer
         for (int j = 0; j < config.num_compose_tokens; ++j)
         {
@@ -363,12 +370,26 @@ Cost NNClassifier::thread_proc(vector<Sample> & chunk, size_t batch_size)
             int tok_l_llc1 = features[tree.find("l_lc1lc1")->second];
             int tok_l_rrc1 = features[tree.find("l_rc1rc1")->second];
 
-            int idx_l_lc1  = tok_l_lc1 - Eb_label_start;
-            int idx_l_lc2  = tok_l_lc2 - Eb_label_start;
-            int idx_l_rc1  = tok_l_rc1 - Eb_label_start;
-            int idx_l_rc2  = tok_l_rc2 - Eb_label_start;
-            int idx_l_llc1 = tok_l_llc1 - Eb_label_start;
-            int idx_l_rrc1 = tok_l_rrc1 - Eb_label_start;
+            // index of Wr/Wp for differnet nodes
+            int idx_l_lc1, idx_l_lc2, idx_l_rc1, idx_l_rc2;
+            int idx_l_llc1, idx_l_rrc1;
+
+            if (!config.compose_by_position)
+            {
+                idx_l_lc1  = tok_l_lc1 - Eb_label_start;
+                idx_l_lc2  = tok_l_lc2 - Eb_label_start;
+                idx_l_rc1  = tok_l_rc1 - Eb_label_start;
+                idx_l_rc2  = tok_l_rc2 - Eb_label_start;
+                idx_l_llc1 = tok_l_llc1 - Eb_label_start;
+                idx_l_rrc1 = tok_l_rrc1 - Eb_label_start;
+            }
+            else
+            {
+                idx_l_lc1 = idx_l_llc1 = 0;
+                idx_l_lc2 = 1;
+                idx_l_rc1 = idx_l_rrc1 = 2;
+                idx_l_rc2 = 3;
+            }
 
             // propagate leaf nodes (embedding) to hidden layers
 
@@ -387,10 +408,11 @@ Cost NNClassifier::thread_proc(vector<Sample> & chunk, size_t batch_size)
                     lc2_hidden[j][k]  += Wv[k][l] * Eb[tok_w_lc2][l];
                     rc2_hidden[j][k]  += Wv[k][l] * Eb[tok_w_rc2][l];
 
-                    lc1_hidden[j][k]  += Wv[k][l] * Eb[tok_w_lc1][l];
-                    rc1_hidden[j][k]  += Wv[k][l] * Eb[tok_w_rc1][l];
+                    lc1_hidden[j][k]  += lc1_weight * Wv[k][l] * Eb[tok_w_lc1][l];
+                    // lc1_hidden[j][k]  += Wv[k][l] * Eb[tok_w_lc1][l];
+                    rc1_hidden[j][k]  += rc1_weight * Wv[k][l] * Eb[tok_w_rc1][l];
 
-                    root_hidden[j][k] += Wv[k][l] * Eb[tok_w_root][l];
+                    root_hidden[j][k] += root_weight * Wv[k][l] * Eb[tok_w_root][l];
                 }
             }
             // non-linear activation for llc1, rrc1, lc2, rc2
@@ -409,8 +431,8 @@ Cost NNClassifier::thread_proc(vector<Sample> & chunk, size_t batch_size)
             {
                 for (int l = 0; l < config.compose_embedding_size; ++l)
                 {
-                    lc1_hidden[j][k] += Wr[idx_l_llc1][k][l] * llc1_hidden[j][l];
-                    rc1_hidden[j][k] += Wr[idx_l_rrc1][k][l] * rrc1_hidden[j][l];
+                    lc1_hidden[j][k] += lc1_weight * Wr[idx_l_llc1][k][l] * llc1_hidden[j][l];
+                    rc1_hidden[j][k] += rc1_weight * Wr[idx_l_rrc1][k][l] * rrc1_hidden[j][l];
                 }
             }
             // non-linear activation for lc1, lc2
@@ -425,10 +447,10 @@ Cost NNClassifier::thread_proc(vector<Sample> & chunk, size_t batch_size)
             {
                 for (int l = 0; l < config.compose_embedding_size; ++l)
                 {
-                    root_hidden[j][k] += Wr[idx_l_lc1][k][l] * lc1_hidden[j][l] // lc1
-                                    + Wr[idx_l_lc2][k][l] * lc2_hidden[j][l] // lc2
-                                    + Wr[idx_l_rc2][k][l] * rc2_hidden[j][l] // rc2
-                                    + Wr[idx_l_rc1][k][l] * rc1_hidden[j][l];// rc1
+                    root_hidden[j][k] += (root_weight * lc1_nchild) * Wr[idx_l_lc1][k][l] * lc1_hidden[j][l] // lc1
+                                    + root_weight * Wr[idx_l_lc2][k][l] * lc2_hidden[j][l] // lc2
+                                    + root_weight * Wr[idx_l_rc2][k][l] * rc2_hidden[j][l] // rc2
+                                    + (root_weight * rc1_nchild) * Wr[idx_l_rc1][k][l] * rc1_hidden[j][l];// rc1
                 }
             }
             // non-linear activation for w_root
@@ -507,8 +529,8 @@ Cost NNClassifier::thread_proc(vector<Sample> & chunk, size_t batch_size)
         {
             if (label[j] >= 0)
             {
-                scores[j] = fasterexp(scores[j] - max_score);
-                // scores[j] = exp(scores[j] - max_score);
+                // scores[j] = fasterexp(scores[j] - max_score);
+                scores[j] = exp(scores[j] - max_score);
                 if (label[j] == 1) sum1 += scores[j];
                 sum2 += scores[j];
             }
@@ -673,13 +695,24 @@ Cost NNClassifier::thread_proc(vector<Sample> & chunk, size_t batch_size)
             int tok_l_llc1 = features[tree.find("l_lc1lc1")->second];
             int tok_l_rrc1 = features[tree.find("l_rc1rc1")->second];
 
-            int idx_l_lc1  = tok_l_lc1 - Eb_label_start;
-            int idx_l_lc2  = tok_l_lc2 - Eb_label_start;
-            int idx_l_rc1  = tok_l_rc1 - Eb_label_start;
-            int idx_l_rc2  = tok_l_rc2 - Eb_label_start;
-            int idx_l_llc1 = tok_l_llc1 - Eb_label_start;
-            int idx_l_rrc1 = tok_l_rrc1 - Eb_label_start;
-
+            int idx_l_lc1, idx_l_lc2, idx_l_rc1, idx_l_rc2;
+            int idx_l_llc1, idx_l_rrc1;
+            if (!config.compose_by_position)
+            {
+                idx_l_lc1  = tok_l_lc1 - Eb_label_start;
+                idx_l_lc2  = tok_l_lc2 - Eb_label_start;
+                idx_l_rc1  = tok_l_rc1 - Eb_label_start;
+                idx_l_rc2  = tok_l_rc2 - Eb_label_start;
+                idx_l_llc1 = tok_l_llc1 - Eb_label_start;
+                idx_l_rrc1 = tok_l_rrc1 - Eb_label_start;
+            }
+            else
+            {
+                idx_l_lc1 = idx_l_llc1 = 0;
+                idx_l_lc2 = 1;
+                idx_l_rc1 = idx_l_rrc1 = 2;
+                idx_l_rc2 = 3;
+            }
 
             // compute grad_root_hidden
             for (size_t k = 0; k < active_units.size(); ++k)
@@ -701,22 +734,22 @@ Cost NNClassifier::thread_proc(vector<Sample> & chunk, size_t batch_size)
                                      * (1 - root_hidden[j][k] * root_hidden[j][k]);
                 for (int l = 0; l < config.compose_embedding_size; ++l)
                 {
-                    grad_Wr[idx_l_lc1][k][l] += grad_root_net * lc1_hidden[j][l];
-                    grad_lc1_hidden[j][l] += grad_root_net * Wr[idx_l_lc1][k][l];
+                    grad_Wr[idx_l_lc1][k][l] += grad_root_net * (root_weight * lc1_nchild) * lc1_hidden[j][l];
+                    grad_lc1_hidden[j][l] += grad_root_net * (root_weight * lc1_nchild) * Wr[idx_l_lc1][k][l];
 
-                    grad_Wr[idx_l_lc2][k][l] += grad_root_net * lc2_hidden[j][l];
-                    grad_lc2_hidden[j][l] += grad_root_net * Wr[idx_l_lc2][k][l];
+                    grad_Wr[idx_l_lc2][k][l] += grad_root_net * root_weight * lc2_hidden[j][l];
+                    grad_lc2_hidden[j][l] += grad_root_net * root_weight * Wr[idx_l_lc2][k][l];
 
-                    grad_Wr[idx_l_rc2][k][l] += grad_root_net * rc2_hidden[j][l];
-                    grad_rc2_hidden[j][l] += grad_root_net * Wr[idx_l_rc2][k][l];
+                    grad_Wr[idx_l_rc2][k][l] += grad_root_net * root_weight * rc2_hidden[j][l];
+                    grad_rc2_hidden[j][l] += grad_root_net * root_weight * Wr[idx_l_rc2][k][l];
 
-                    grad_Wr[idx_l_rc1][k][l] += grad_root_net * rc1_hidden[j][l];
-                    grad_rc1_hidden[j][l] += grad_root_net * Wr[idx_l_rc1][k][l];
+                    grad_Wr[idx_l_rc1][k][l] += grad_root_net * (root_weight * rc1_nchild) * rc1_hidden[j][l];
+                    grad_rc1_hidden[j][l] += grad_root_net * (root_weight * rc1_nchild) * Wr[idx_l_rc1][k][l];
                 }
                 for (int l = 0; l < config.embedding_size; ++l)
                 {
-                    grad_Wv[k][l] += grad_root_net * Eb[tok_w_root][l];
-                    grad_Eb[tok_w_root][l] += grad_root_net * Wv[k][l];
+                    grad_Wv[k][l] += grad_root_net * root_weight * Eb[tok_w_root][l];
+                    grad_Eb[tok_w_root][l] += grad_root_net * root_weight * Wv[k][l];
                 }
             }
 
@@ -728,14 +761,14 @@ Cost NNClassifier::thread_proc(vector<Sample> & chunk, size_t batch_size)
                 // llc1_hidden
                 for (int l = 0; l < config.compose_embedding_size; ++l)
                 {
-                    grad_Wr[idx_l_llc1][k][l] += grad_lc1_net * llc1_hidden[j][l];
-                    grad_llc1_hidden[j][l] += grad_lc1_net * Wr[idx_l_llc1][k][l];
+                    grad_Wr[idx_l_llc1][k][l] += grad_lc1_net * lc1_weight * llc1_hidden[j][l];
+                    grad_llc1_hidden[j][l] += grad_lc1_net * lc1_weight * Wr[idx_l_llc1][k][l];
                 }
                 // lc1
                 for (int l = 0; l < config.embedding_size; ++l)
                 {
-                    grad_Wv[k][l] += grad_lc1_net * Eb[tok_w_lc1][l];
-                    grad_Eb[tok_w_lc1][l] += grad_lc1_net * Wv[k][l];
+                    grad_Wv[k][l] += grad_lc1_net * lc1_weight * Eb[tok_w_lc1][l];
+                    grad_Eb[tok_w_lc1][l] += grad_lc1_net * lc1_weight * Wv[k][l];
                 }
             }
 
@@ -765,7 +798,7 @@ Cost NNClassifier::thread_proc(vector<Sample> & chunk, size_t batch_size)
                 }
             }
 
-            // compute grad_rc1_hidden and grad(rc1)
+            // compute grad_rrc1_hidden and grad(rc1)
             for (int k = 0; k < config.compose_embedding_size; ++k)
             {
                 double grad_rc1_net = grad_rc1_hidden[j][k]
@@ -773,13 +806,13 @@ Cost NNClassifier::thread_proc(vector<Sample> & chunk, size_t batch_size)
                 // rc1
                 for (int l = 0; l < config.compose_embedding_size; ++l)
                 {
-                    grad_Wr[idx_l_rrc1][k][l] += grad_rc1_net * rrc1_hidden[j][l];
-                    grad_rrc1_hidden[j][l] += grad_rc1_net * Wr[idx_l_rrc1][k][l];
+                    grad_Wr[idx_l_rrc1][k][l] += grad_rc1_net * rc1_weight * rrc1_hidden[j][l];
+                    grad_rrc1_hidden[j][l] += grad_rc1_net * rc1_weight * Wr[idx_l_rrc1][k][l];
                 }
                 for (int l = 0; l < config.embedding_size; ++l)
                 {
-                    grad_Wv[k][l] += grad_rc1_net * Eb[tok_w_rc1][l];
-                    grad_Eb[tok_w_rc1][l] += grad_rc1_net * Wv[k][l];
+                    grad_Wv[k][l] += grad_rc1_net * rc1_weight * Eb[tok_w_rc1][l];
+                    grad_Eb[tok_w_rc1][l] += grad_rc1_net * rc1_weight * Wv[k][l];
                 }
             }
 
@@ -1423,10 +1456,17 @@ double NNClassifier::compute_cost()
         Mat<double> rc1_hidden(0.0, config.num_compose_tokens, config.compose_embedding_size);
         Mat<double> root_hidden(0.0, config.num_compose_tokens, config.compose_embedding_size);
 
+        int lc1_nchild = (config.compose_weighted) ? 2 : 1;
+        double lc1_weight = 1.0 / lc1_nchild;
+        int rc1_nchild = (config.compose_weighted) ? 2 : 1;
+        double rc1_weight = 1.0 / rc1_nchild;
+        int root_nchild = (config.compose_weighted) ? 7 : 1;
+        double root_weight = 1.0 / root_nchild;
+
         // feed forward the composed tokens to hidden layer
         for (int j = 0; j < config.num_compose_tokens; ++j)
         {
-            // cerr << "Feed-forward the composition layer " << j << endl;
+            // cerr << "Feed-forward the composition layers " << j << endl;
             // j = 0 | 1
             const unordered_map<string, int> tree = compose_structure[j];
 
@@ -1445,15 +1485,33 @@ double NNClassifier::compute_cost()
             int tok_l_llc1 = features[tree.find("l_lc1lc1")->second];
             int tok_l_rrc1 = features[tree.find("l_rc1rc1")->second];
 
-            int idx_l_lc1  = tok_l_lc1 - Eb_label_start;
-            int idx_l_lc2  = tok_l_lc2 - Eb_label_start;
-            int idx_l_rc1  = tok_l_rc1 - Eb_label_start;
-            int idx_l_rc2  = tok_l_rc2 - Eb_label_start;
-            int idx_l_llc1 = tok_l_llc1 - Eb_label_start;
-            int idx_l_rrc1 = tok_l_rrc1 - Eb_label_start;
+            // index of Wr/Wp for differnet nodes
+            int idx_l_lc1, idx_l_lc2, idx_l_rc1, idx_l_rc2;
+            int idx_l_llc1, idx_l_rrc1;
+            if (!config.compose_by_position)
+            {
+                idx_l_lc1  = tok_l_lc1 - Eb_label_start;
+                idx_l_lc2  = tok_l_lc2 - Eb_label_start;
+                idx_l_rc1  = tok_l_rc1 - Eb_label_start;
+                idx_l_rc2  = tok_l_rc2 - Eb_label_start;
+                idx_l_llc1 = tok_l_llc1 - Eb_label_start;
+                idx_l_rrc1 = tok_l_rrc1 - Eb_label_start;
+            }
+            else
+            {
+                idx_l_lc1 = idx_l_llc1 = 0;
+                idx_l_lc2 = 1;
+                idx_l_rc1 = idx_l_rrc1 = 2;
+                idx_l_rc2 = 3;
+            }
 
             // propagate leaf nodes (embedding) to hidden layers
 
+            // in contrast to the cube activation function
+            //  for sigmoidal functions, we don't have to store
+            //  all hidden outputs before activation (W * x + b)
+            //  So, we can just overwrite the hidden layer to store
+            //  the activated output.
             for (int k = 0; k < config.compose_embedding_size; ++k)
             {
                 for (int l = 0; l < Eb.ncols(); ++l)
@@ -1464,10 +1522,10 @@ double NNClassifier::compute_cost()
                     lc2_hidden[j][k]  += Wv[k][l] * Eb[tok_w_lc2][l];
                     rc2_hidden[j][k]  += Wv[k][l] * Eb[tok_w_rc2][l];
 
-                    lc1_hidden[j][k]  += Wv[k][l] * Eb[tok_w_lc1][l];
-                    rc1_hidden[j][k]  += Wv[k][l] * Eb[tok_w_rc1][l];
+                    lc1_hidden[j][k]  += lc1_weight * Wv[k][l] * Eb[tok_w_lc1][l];
+                    rc1_hidden[j][k]  += rc1_weight * Wv[k][l] * Eb[tok_w_rc1][l];
 
-                    root_hidden[j][k] += Wv[k][l] * Eb[tok_w_root][l];
+                    root_hidden[j][k] += root_weight * Wv[k][l] * Eb[tok_w_root][l];
                 }
             }
             // non-linear activation for llc1, rrc1, lc2, rc2
@@ -1486,8 +1544,8 @@ double NNClassifier::compute_cost()
             {
                 for (int l = 0; l < config.compose_embedding_size; ++l)
                 {
-                    lc1_hidden[j][k] += Wr[idx_l_llc1][k][l] * llc1_hidden[j][l];
-                    rc1_hidden[j][k] += Wr[idx_l_rrc1][k][l] * rrc1_hidden[j][l];
+                    lc1_hidden[j][k] += lc1_weight * Wr[idx_l_llc1][k][l] * llc1_hidden[j][l];
+                    rc1_hidden[j][k] += rc1_weight * Wr[idx_l_rrc1][k][l] * rrc1_hidden[j][l];
                 }
             }
             // non-linear activation for lc1, lc2
@@ -1502,10 +1560,10 @@ double NNClassifier::compute_cost()
             {
                 for (int l = 0; l < config.compose_embedding_size; ++l)
                 {
-                    root_hidden[j][k] += Wr[idx_l_lc1][k][l] * lc1_hidden[j][l] // lc1
-                                    + Wr[idx_l_lc2][k][l] * lc2_hidden[j][l] // lc2
-                                    + Wr[idx_l_rc2][k][l] * rc2_hidden[j][l] // rc2
-                                    + Wr[idx_l_rc1][k][l] * rc1_hidden[j][l];// rc1
+                    root_hidden[j][k] += (root_weight * lc1_nchild) * Wr[idx_l_lc1][k][l] * lc1_hidden[j][l] // lc1
+                                    + root_weight * Wr[idx_l_lc2][k][l] * lc2_hidden[j][l] // lc2
+                                    + root_weight * Wr[idx_l_rc2][k][l] * rc2_hidden[j][l] // rc2
+                                    + (root_weight * rc1_nchild) * Wr[idx_l_rc1][k][l] * rc1_hidden[j][l];// rc1
                 }
             }
             // non-linear activation for w_root
@@ -1553,8 +1611,8 @@ double NNClassifier::compute_cost()
         {
             if (label[j] >= 0)
             {
-                scores[j] = fasterexp(scores[j] - max_score);
-                // scores[j] = exp(scores[j] - max_score);
+                // scores[j] = fasterexp(scores[j] - max_score);
+                scores[j] = exp(scores[j] - max_score);
                 // scores[j] = exp(scores[j]);
                 if (label[j] == 1) sum1 += scores[j];
                 sum2 += scores[j];
@@ -1964,9 +2022,17 @@ void NNClassifier::compute_scores(
     Mat<double> rc1_hidden(0.0, config.num_compose_tokens, config.compose_embedding_size);
     Mat<double> root_hidden(0.0, config.num_compose_tokens, config.compose_embedding_size);
 
+    int lc1_nchild = (config.compose_weighted) ? 2 : 1;
+    double lc1_weight = 1.0 / lc1_nchild;
+    int rc1_nchild = (config.compose_weighted) ? 2 : 1;
+    double rc1_weight = 1.0 / rc1_nchild;
+    int root_nchild = (config.compose_weighted) ? 7 : 1;
+    double root_weight = 1.0 / root_nchild;
+
     // feed forward the composed tokens to hidden layer
     for (int j = 0; j < config.num_compose_tokens; ++j)
     {
+        // cerr << "Feed-forward the composition layers " << j << endl;
         // j = 0 | 1
         const unordered_map<string, int> tree = compose_structure[j];
 
@@ -1985,12 +2051,26 @@ void NNClassifier::compute_scores(
         int tok_l_llc1 = features[tree.find("l_lc1lc1")->second];
         int tok_l_rrc1 = features[tree.find("l_rc1rc1")->second];
 
-        int idx_l_lc1  = tok_l_lc1 - Eb_label_start;
-        int idx_l_lc2  = tok_l_lc2 - Eb_label_start;
-        int idx_l_rc1  = tok_l_rc1 - Eb_label_start;
-        int idx_l_rc2  = tok_l_rc2 - Eb_label_start;
-        int idx_l_llc1 = tok_l_llc1 - Eb_label_start;
-        int idx_l_rrc1 = tok_l_rrc1 - Eb_label_start;
+        // index of Wr/Wp for differnet nodes
+        int idx_l_lc1, idx_l_lc2, idx_l_rc1, idx_l_rc2;
+        int idx_l_llc1, idx_l_rrc1;
+
+        if (!config.compose_by_position)
+        {
+            idx_l_lc1  = tok_l_lc1 - Eb_label_start;
+            idx_l_lc2  = tok_l_lc2 - Eb_label_start;
+            idx_l_rc1  = tok_l_rc1 - Eb_label_start;
+            idx_l_rc2  = tok_l_rc2 - Eb_label_start;
+            idx_l_llc1 = tok_l_llc1 - Eb_label_start;
+            idx_l_rrc1 = tok_l_rrc1 - Eb_label_start;
+        }
+        else
+        {
+            idx_l_lc1 = idx_l_llc1 = 0;
+            idx_l_lc2 = 1;
+            idx_l_rc1 = idx_l_rrc1 = 2;
+            idx_l_rc2 = 3;
+        }
 
         // propagate leaf nodes (embedding) to hidden layers
 
@@ -2009,10 +2089,10 @@ void NNClassifier::compute_scores(
                 lc2_hidden[j][k]  += Wv[k][l] * Eb[tok_w_lc2][l];
                 rc2_hidden[j][k]  += Wv[k][l] * Eb[tok_w_rc2][l];
 
-                lc1_hidden[j][k]  += Wv[k][l] * Eb[tok_w_lc1][l];
-                rc1_hidden[j][k]  += Wv[k][l] * Eb[tok_w_rc1][l];
+                lc1_hidden[j][k]  += lc1_weight * Wv[k][l] * Eb[tok_w_lc1][l];
+                rc1_hidden[j][k]  += rc1_weight * Wv[k][l] * Eb[tok_w_rc1][l];
 
-                root_hidden[j][k] += Wv[k][l] * Eb[tok_w_root][l];
+                root_hidden[j][k] += root_weight * Wv[k][l] * Eb[tok_w_root][l];
             }
         }
         // non-linear activation for llc1, rrc1, lc2, rc2
@@ -2031,8 +2111,8 @@ void NNClassifier::compute_scores(
         {
             for (int l = 0; l < config.compose_embedding_size; ++l)
             {
-                lc1_hidden[j][k] += Wr[idx_l_llc1][k][l] * llc1_hidden[j][l];
-                rc1_hidden[j][k] += Wr[idx_l_rrc1][k][l] * rrc1_hidden[j][l];
+                lc1_hidden[j][k] += lc1_weight * Wr[idx_l_llc1][k][l] * llc1_hidden[j][l];
+                rc1_hidden[j][k] += rc1_weight * Wr[idx_l_rrc1][k][l] * rrc1_hidden[j][l];
             }
         }
         // non-linear activation for lc1, lc2
@@ -2047,10 +2127,10 @@ void NNClassifier::compute_scores(
         {
             for (int l = 0; l < config.compose_embedding_size; ++l)
             {
-                root_hidden[j][k] += Wr[idx_l_lc1][k][l] * lc1_hidden[j][l] // lc1
-                                + Wr[idx_l_lc2][k][l] * lc2_hidden[j][l] // lc2
-                                + Wr[idx_l_rc2][k][l] * rc2_hidden[j][l] // rc2
-                                + Wr[idx_l_rc1][k][l] * rc1_hidden[j][l];// rc1
+                root_hidden[j][k] += (root_weight * lc1_nchild) * Wr[idx_l_lc1][k][l] * lc1_hidden[j][l] // lc1
+                                + root_weight * Wr[idx_l_lc2][k][l] * lc2_hidden[j][l] // lc2
+                                + root_weight * Wr[idx_l_rc2][k][l] * rc2_hidden[j][l] // rc2
+                                + (root_weight * rc1_nchild) * Wr[idx_l_rc1][k][l] * rc1_hidden[j][l];// rc1
             }
         }
         // non-linear activation for w_root

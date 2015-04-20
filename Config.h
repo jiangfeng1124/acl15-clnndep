@@ -125,6 +125,9 @@ class Config
         int num_compose_tokens;
         int compose_embedding_size;
 
+        bool compose_weighted;
+        bool compose_by_position;
+
         bool debug;
 
     public:

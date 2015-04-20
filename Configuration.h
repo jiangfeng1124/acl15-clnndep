@@ -74,6 +74,8 @@ class Configuration
 
         int get_right_valency(int k);
 
+        DependencyTree get_tree();
+
         std::string info();
 
     private:

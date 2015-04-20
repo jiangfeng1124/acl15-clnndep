@@ -1408,7 +1408,7 @@ void DependencyParser::predict(
     // vector<DependencyTree> result;
     trees.clear();
     trees.resize(sents.size());
-    #pragma omp parallel for
+    // #pragma omp parallel for
     for (size_t i = 0; i < sents.size(); ++i)
     {
         cerr << "\r" << i << "    ";

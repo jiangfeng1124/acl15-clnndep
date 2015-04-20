@@ -591,7 +591,8 @@ void DependencyParser::setup_classifier_for_training(
     int n_actions = (config.labeled) ? (known_labels.size() * 2 - 1) : 3;
     Mat<double> W2(0.0, n_actions, config.hidden_size);
     Mat<double> Wv(0.0, config.compose_embedding_size, config.embedding_size);
-    Mat3<double> Wr(0.0, known_labels.size(),
+    int Wr_len = (config.compose_by_position) ? 4 : known_labels.size();
+    Mat3<double> Wr(0.0, Wr_len,
                          config.compose_embedding_size,  // target composed repr
                          config.compose_embedding_size); // source composed repr
 
@@ -1637,7 +1638,8 @@ void DependencyParser::load_model(const char * filename, bool re_precompute)
     int W1_ncol = Eb_size * n_basic_tokens
                 + Ed_size * n_dist_tokens
                 + Ev_size * n_valency_tokens
-                + Ec_size * n_cluster_tokens;
+                + Ec_size * n_cluster_tokens
+                + Ecomp_size * n_compose_tokens;
 
     Mat<double> W1(h_size, W1_ncol);
     for (int j = 0; j < W1.ncols(); ++j)
@@ -1679,7 +1681,8 @@ void DependencyParser::load_model(const char * filename, bool re_precompute)
             Wv[i][j] = to_double_sci(sep[i]);
     }
 
-    Mat3<double> Wr(n_label, Ecomp_size, Ecomp_size);
+    int Wr_len = (config.compose_by_position) ? 4 : n_label;
+    Mat3<double> Wr(Wr_len, Ecomp_size, Ecomp_size);
     for (int i = 0; i < Wr.dim1(); ++i)
     { // n_labels
         for (int l = 0; l < Wr.dim3(); ++l)
@@ -1956,7 +1959,8 @@ void DependencyParser::load_model_cl(
             Wv[i][j] = to_double_sci(sep[i]);
     }
 
-    Mat3<double> Wr(n_label, Ecomp_size, Ecomp_size);
+    int Wr_len = (config.compose_by_position) ? 4 : n_label;
+    Mat3<double> Wr(Wr_len, Ecomp_size, Ecomp_size);
     for (int i = 0; i < Wr.dim1(); ++i)
     { // n_labels
         for (int l = 0; l < Wr.dim3(); ++l)

@@ -315,6 +315,11 @@ int Configuration::get_right_valency(int k)
     return cnt;
 }
 
+DependencyTree Configuration::get_tree()
+{
+    return tree;
+}
+
 string Configuration::info()
 {
     string s = "[S]";
