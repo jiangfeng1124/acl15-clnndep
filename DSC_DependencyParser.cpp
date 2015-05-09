@@ -65,7 +65,7 @@ void DependencyParser::train(
         int sub_sampling)
 {
     // omp_set_num_threads(30);
-    omp_set_num_threads(6);
+    omp_set_num_threads(config.training_threads);
     int n_threads = omp_get_max_threads();
     if (n_threads > 1)
         cerr << "Using " << n_threads << " threads" << endl;
@@ -613,13 +613,15 @@ void DependencyParser::setup_classifier_for_training(
         for (int j = 0; j < W2.ncols(); ++j)
             W2[i][j] = (Util::rand_double() * 2 - 1) * W2_init_range;
 
-    double Wv_init_range = sqrt(6.0 / (Wv.nrows() + Wv.ncols()));
+    // double Wv_init_range = sqrt(6.0 / (Wv.nrows() + Wv.ncols()));
+    double Wv_init_range = 0.01;
     #pragma omp parallel for
     for (int i = 0; i < Wv.nrows(); ++i)
         for (int j = 0; j < Wv.ncols(); ++j)
             Wv[i][j] = (Util::rand_double() * 2 - 1) * Wv_init_range;
 
-    double Wr_init_range = sqrt(6.0 / (Wr.dim2() + Wr.dim3()));
+    // double Wr_init_range = sqrt(6.0 / (Wr.dim2() + Wr.dim3()));
+    double Wr_init_range = 0.01;
     #pragma omp parallel for
     for (int i = 0; i < Wr.dim1(); ++i)
         for (int j = 0; j < Wr.dim2(); ++j)
@@ -936,7 +938,9 @@ Dataset DependencyParser::gen_train_samples(
             // cerr << i << " is projective" << endl;
             Configuration c(sents[i]);
             DSCTree dsctree;
+            dsctree.add_word(-1, get_word_id(Config::NIL));
             dsctree.add_word(0, get_word_id(Config::ROOT));
+            dsctree.add_root(0);
             while (!system->is_terminal(c))
             {
                 string oracle = system->get_oracle(c, trees[i]);
@@ -954,6 +958,7 @@ Dataset DependencyParser::gen_train_samples(
 
                 // DependencyTree tree = c.get_tree();
                 ds_train.add_sample(features, dsctree, label);
+
                 for (size_t j = 0; j < features.size(); ++j)
                 {
                     int feature_id = features[j] * features.size() + j;
@@ -1375,16 +1380,27 @@ void DependencyParser::update_dsctree_standard(
     int w2 = c.get_stack(0);
     int b0 = c.get_buffer(0);
 
+    int idx_t_start = known_words.size() + known_poss.size();
+    // int idx_t = 
     if (startswith(t, "L"))
     {
-        tree.add_arc(w2, w1, get_label_id(t.substr(2, t.length() - 3)));
+        tree.add_arc(w2, w1, get_label_id(t.substr(2, t.length() - 3)) - idx_t_start);
+        // remove roots[1]
+        tree.del_root(1);
     }
     else if (startswith(t, "R"))
     {
-        tree.add_arc(w1, w2, get_label_id(t.substr(2, t.length() - 3)));
+        tree.add_arc(w1, w2, get_label_id(t.substr(2, t.length() - 3)) - idx_t_start);
+        // remove roots[0]
+        tree.del_root(0);
     }
     else
+    {
         tree.add_word(b0, get_word_id(c.get_word(b0)));
+        tree.add_root(b0);
+    }
+
+    tree.trim(config.max_compose_layers);
 
     // shift
     // tree.add_word(w1, get_word_id(c.get_word(w1)));
@@ -1408,7 +1424,7 @@ int DependencyParser::get_word_id(const string & s)
     /*
     if (word_ids.find(sl) == word_ids.end())
     {
-        // sl = str_tolower(sl);
+        sl = str_tolower(sl);
         if (word_ids.find(sl) == word_ids.end())
             return word_ids[sl];
         else
@@ -1465,7 +1481,9 @@ void DependencyParser::predict(
     Configuration c(sent);
 
     DSCTree dsctree;
+    dsctree.add_word(-1, get_word_id(Config::NIL));
     dsctree.add_word(0, get_word_id(Config::ROOT));
+    dsctree.add_root(0);
 
     while (!system->is_terminal(c))
     {
@@ -1476,6 +1494,7 @@ void DependencyParser::predict(
         double opt_score = -DBL_MAX;
         string opt_trans = "";
 
+        dsctree.print();
         for (int i = 0; i < num_trans; ++i)
         {
             if (scores[i] > opt_score)
@@ -2045,6 +2064,12 @@ void DependencyParser::test(
 {
     // predict
     cerr << "Test file: " << test_file << endl;
+
+    // omp_set_num_threads(30);
+    omp_set_num_threads(config.training_threads);
+    int n_threads = omp_get_max_threads();
+    if (n_threads > 1)
+        cerr << "Using " << n_threads << " threads" << endl;
 
     double start = get_time();
 

@@ -1308,7 +1308,7 @@ int DependencyParser::get_word_id(const string & s)
     */
     if (word_ids.find(sl) == word_ids.end())
     {
-        // sl = str_tolower(sl);
+        sl = str_tolower(sl);
         if (word_ids.find(sl) == word_ids.end())
             return word_ids[sl];
         else

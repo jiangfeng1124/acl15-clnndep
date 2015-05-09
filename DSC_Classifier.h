@@ -162,6 +162,14 @@ class Cost
         }
 };
 
+enum Activation
+{
+    Tanh,
+    Sigmoid,
+    ReLU,
+    LeakyReLU
+};
+
 class NNClassifier
 {
     public:
@@ -288,6 +296,10 @@ class NNClassifier
 
         Mat<double>& get_Wv();
         Mat3<double>& get_Wr();
+
+        double sigmoid(double a);
+        double relu(double a);
+        double leaky_relu(double a);
 
         void print_info();
 

@@ -79,6 +79,8 @@ void Config::init()
     compose_embedding_size  = 50;
     compose_weighted        = false;
     compose_by_position     = false;
+    max_compose_layers      = -1;
+    compose_activation      = 0;
 
     debug                   = false;
 }
@@ -141,6 +143,8 @@ void Config::set_properties(const char * filename)
     cfg_set_int(props, "cluster_embedding_size",    cluster_embedding_size);
     cfg_set_int(props, "compose_embedding_size",    compose_embedding_size);
     cfg_set_int(props, "num_compose_tokens",        num_compose_tokens);
+    cfg_set_int(props, "max_compose_layers",        max_compose_layers);
+    cfg_set_int(props, "compose_activation",        compose_activation);
 
     cfg_set_double(props, "init_range",             init_range);
     cfg_set_double(props, "ada_eps",                ada_eps);
@@ -262,6 +266,8 @@ void Config::print_info()
     cerr << "compose_embedding_size  = " << compose_embedding_size  << endl;
     cerr << "compose_weighted        = " << compose_weighted        << endl;
     cerr << "compose_by_position     = " << compose_by_position     << endl;
+    cerr << "max_compose_layers      = " << max_compose_layers      << endl;
+    cerr << "compose_activation      = " << compose_activation      << endl;
 
     cerr << "debug                   = " << debug                   << endl;
 }

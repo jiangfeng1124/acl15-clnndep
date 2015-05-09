@@ -40,43 +40,6 @@ Mat<double> NNClassifier::Ed;
 Mat<double> NNClassifier::Ev;
 Mat<double> NNClassifier::Ec;
 
-const vector< unordered_map<string, int> > NNClassifier::compose_structure = {
-    {
-        // word tokens
-        {"w_lc1", 6},
-        {"w_lc1lc1", 10},
-        {"w_lc2", 8},
-        {"w_root", 2},
-        {"w_rc1", 7},
-        {"w_rc1rc1", 11},
-        {"w_rc2", 9},
-        // label tokens (work tokens + 30)
-        {"l_lc1", 36},
-        {"l_lc1lc1", 40},
-        {"l_lc2", 38},
-        {"l_rc1", 37},
-        {"l_rc1rc1", 41},
-        {"l_rc2", 39},
-    },
-    {
-        // word tokens
-        {"w_lc1", 12},
-        {"w_lc1lc1", 16},
-        {"w_lc2", 14},
-        {"w_root", 1},
-        {"w_rc1", 13},
-        {"w_rc1rc1", 17},
-        {"w_rc2", 15},
-        // label tokens (work tokens + 30)
-        {"l_lc1", 42},
-        {"l_lc1lc1", 46},
-        {"l_lc2", 44},
-        {"l_rc1", 43},
-        {"l_rc1rc1", 47},
-        {"l_rc2", 45},
-    }
-};
-
 Dataset NNClassifier::dataset;
 
 
@@ -224,9 +187,12 @@ void NNClassifier::rnn_feed_forward(
     Vec<double> h_root(.0, config.compose_embedding_size);
     rnn[root] = h_root;
 
+    // tree.print();
+    // cerr << "root = " << root << endl;
     // forward from the hidden layer of its children
     if (tree.tree.find(root) != tree.tree.end())
     {
+        // cerr << "recursion = " << endl;
         for (size_t i = 0; i < tree.tree[root].size(); ++i)
         {
             int c = tree.tree[root][i];
@@ -236,7 +202,7 @@ void NNClassifier::rnn_feed_forward(
                                 ? ((double)tree.indegree[c] / tree.indegree[root])
                                 : 1;
             for (int j = 0; j < config.compose_embedding_size; ++j)
-                for (int k = 0; k < config.compose_embedding_size; ++j)
+                for (int k = 0; k < config.compose_embedding_size; ++k)
                     rnn[root][j] += Wr_weight * Wr[rel][j][k] * rnn[c][k];
         }
     }
@@ -246,11 +212,25 @@ void NNClassifier::rnn_feed_forward(
                         : 1;
     for (int i = 0; i < config.compose_embedding_size; ++i)
         for (int j = 0; j < Eb.ncols(); ++j)
-            h_root[i] += Wv_weight * Wv[i][j] * Eb[tree.wordids[root]][j];
+            rnn[root][i] += Wv_weight * Wv[i][j] * Eb[tree.wordids[root]][j];
 
     // activation
     for (int i = 0; i < config.compose_embedding_size; ++i)
-        rnn[root][i] = tanh(rnn[root][i]);
+    {
+        switch (config.compose_activation)
+        {
+            case Tanh:
+                rnn[root][i] = tanh(rnn[root][i]); break;
+            case Sigmoid:
+                rnn[root][i] = sigmoid(rnn[root][i]); break;
+            case ReLU:
+                rnn[root][i] = relu(rnn[root][i]); break;
+            case LeakyReLU:
+                rnn[root][i] = leaky_relu(rnn[root][i]); break;
+            default: // Linear
+                break;
+        }
+    }
 }
 
 void NNClassifier::rnn_back_propagate(
@@ -264,8 +244,28 @@ void NNClassifier::rnn_back_propagate(
 {
     Vec<double> grad_net(.0, config.compose_embedding_size);
     for (int i = 0; i < config.compose_embedding_size; ++i)
-        grad_net[i] = grad_rnn[root][i]
-                    * (1 - rnn[root][i] * rnn[root][i]);
+    {
+        switch (config.compose_activation)
+        {
+            case Tanh:
+                grad_net[i] = grad_rnn[root][i] * (1 - rnn[root][i] * rnn[root][i]);
+                break;
+            case Sigmoid:
+                grad_net[i] = grad_rnn[root][i] * rnn[root][i] * (1 - rnn[root][i]);
+                break;
+            case ReLU:
+                grad_net[i] = grad_rnn[root][i] * ((rnn[root][i] > 0) ? 1 : 0);
+                break;
+            case LeakyReLU:
+                grad_net[i] = grad_rnn[root][i] * ((rnn[root][i] > 0) ? 1 : 0.01);
+                break;
+            default: // linear
+                break;
+        }
+    }
+
+    // tree.print();
+    // cerr << "root = " << root << endl;
 
     // backprop to the root token
     double Wv_weight = (config.compose_weighted)
@@ -282,21 +282,31 @@ void NNClassifier::rnn_back_propagate(
     // backprop to children nodes
     if (tree.tree.find(root) != tree.tree.end()) // has child
     {
+        // cerr << "recursion" << endl;
+        // cerr << "root = " << root << endl;
         for (size_t i = 0; i < tree.tree[root].size(); ++i)
         {
             int c = tree.tree[root][i];
+            // cerr << "c = " << c << endl;
+            assert (tree.relations.find(c) != tree.relations.end());
             int rel = tree.relations[c];
+            // cerr << "update relation: " << rel << endl;
+            // cerr << "rel = " << rel << endl;
             double Wr_weight = (config.compose_weighted)
                                 ? ((double)tree.indegree[c] / tree.indegree[root])
                                 : 1;
+            // initialize grad_rnn[c]
+            Vec<double> grad_h_c(.0, config.compose_embedding_size);
+            grad_rnn[c] = grad_h_c;
             for (int j = 0; j < config.compose_embedding_size; ++j)
             {
                 for (int k = 0; k < config.compose_embedding_size; ++k)
                 {
-                    grad_Wr[rel][j][k] += Wr_weight * grad_net[i] * rnn[c][k];
-                    grad_rnn[c][k] += Wr_weight * grad_net[i] * Wr[rel][j][k];
+                    grad_Wr[rel][j][k] += Wr_weight * grad_net[j] * rnn[c][k]; // !!
+                    grad_rnn[c][k] += Wr_weight * grad_net[j] * Wr[rel][j][k];
                 }
             }
+            // cerr << "propagate " << c << endl;
             rnn_back_propagate(tree, c, rnn, grad_rnn, grad_Eb, grad_Wv, grad_Wr);
         }
     }
@@ -410,6 +420,7 @@ Cost NNClassifier::thread_proc(vector<Sample> & chunk, size_t batch_size)
         // all hidden layers in DSCTree(s0, s1)
         vector< unordered_map<int, Vec<double> > > vec_dscrnn;
 
+        // cerr << "Sample " << i << ": Feed-forward" << endl;
         // feed forward the composed tokens to hidden layer
         for (int j = 0; j < config.num_compose_tokens; ++j)
         {
@@ -417,7 +428,8 @@ Cost NNClassifier::thread_proc(vector<Sample> & chunk, size_t batch_size)
             // j = 0 | 1 | 2
             // S0, S1, S2
             // -> idx_w_root (feature id)
-            int tok_w_root = features[compose_structure[j].find("w_root")->second];
+            // int tok_w_root = features[compose_structure[j].find("w_root")->second];
+            int tok_w_root = dsctree.get_root(j); // handle -1
 
             // Mat<double> hiddens;
             unordered_map<int, Vec<double> > dscrnn;
@@ -633,12 +645,14 @@ Cost NNClassifier::thread_proc(vector<Sample> & chunk, size_t batch_size)
             offset += emb_size;
         }
 
+        // cerr << "Sample " << i << ": Back-propagate" << endl;
         // vector< unordered_map<int, Vec<double> > > vec_grad_dscrnn;
         // Back-propagation to the composition layers
         for (int j = 0; j < config.num_compose_tokens; ++j)
         {
             // cerr << "back-propagation to the composition layer" << endl;
-            int tok_w_root = features[compose_structure[j].find("w_root")->second];
+            // int tok_w_root = features[compose_structure[j].find("w_root")->second];
+            int tok_w_root = dsctree.get_root(j);
             unordered_map<int, Vec<double> > dscrnn = vec_dscrnn[j];
             unordered_map<int, Vec<double> > grad_dscrnn;
 
@@ -1039,11 +1053,15 @@ void NNClassifier::check_gradient()
     double diff_grad_W1 = Util::l2_norm(Util::mat_subtract(num_grad_W1, cost.grad_W1)) / Util::l2_norm(Util::mat_add(num_grad_W1, cost.grad_W1));
     double diff_grad_b1 = Util::l2_norm(Util::vec_subtract(num_grad_b1, cost.grad_b1)) / Util::l2_norm(Util::vec_add(num_grad_b1, cost.grad_b1));
     double diff_grad_W2 = Util::l2_norm(Util::mat_subtract(num_grad_W2, cost.grad_W2)) / Util::l2_norm(Util::mat_add(num_grad_W2, cost.grad_W2));
+    cerr << "Eb.substract.norm = " << Util::l2_norm(Util::mat_subtract(num_grad_Eb, cost.grad_Eb)) << endl;
+    cerr << "Eb.add.norm       = " << Util::l2_norm(Util::mat_add(num_grad_Eb, cost.grad_Eb)) << endl;
     double diff_grad_Eb = Util::l2_norm(Util::mat_subtract(num_grad_Eb, cost.grad_Eb)) / Util::l2_norm(Util::mat_add(num_grad_Eb, cost.grad_Eb));
     double diff_grad_Ed = Util::l2_norm(Util::mat_subtract(num_grad_Ed, cost.grad_Ed)) / Util::l2_norm(Util::mat_add(num_grad_Ed, cost.grad_Ed));
     double diff_grad_Ev = Util::l2_norm(Util::mat_subtract(num_grad_Ev, cost.grad_Ev)) / Util::l2_norm(Util::mat_add(num_grad_Ev, cost.grad_Ev));
     double diff_grad_Ec = Util::l2_norm(Util::mat_subtract(num_grad_Ec, cost.grad_Ec)) / Util::l2_norm(Util::mat_add(num_grad_Ec, cost.grad_Ec));
     double diff_grad_Wv = Util::l2_norm(Util::mat_subtract(num_grad_Wv, cost.grad_Wv)) / Util::l2_norm(Util::mat_add(num_grad_Wv, cost.grad_Wv));
+    cerr << "Wr.substract.norm = " << Util::l2_norm(Util::mat3_subtract(num_grad_Wr, cost.grad_Wr)) << endl;
+    cerr << "Wr.add.norm       = " << Util::l2_norm(Util::mat3_add(num_grad_Wr, cost.grad_Wr)) << endl;
     double diff_grad_Wr = Util::l2_norm(Util::mat3_subtract(num_grad_Wr, cost.grad_Wr)) / Util::l2_norm(Util::mat3_add(num_grad_Wr, cost.grad_Wr));
 
     /*
@@ -1272,7 +1290,8 @@ double NNClassifier::compute_cost()
             // j = 0 | 1
             // propagate the composed root -> hidden
 
-            int tok_w_root = features[compose_structure[j].find("w_root")->second];
+            // int tok_w_root = features[compose_structure[j].find("w_root")->second];
+            int tok_w_root = dsctree.get_root(j);
 
             // Mat<double> hiddens;
             unordered_map<int, Vec<double> > dscrnn;
@@ -1307,8 +1326,9 @@ double NNClassifier::compute_cost()
                 int node_index = active_units[k];
                 scores[j] += W2[j][node_index] * hidden3[node_index];
             }
-            if (opt_label < 0 || scores[j] > scores[opt_label])
-                opt_label = j;
+            if (label[j] >= 0)
+                if (opt_label < 0 || scores[j] > scores[opt_label])
+                    opt_label = j;
         }
 
         double sum1 = .0;
@@ -1593,6 +1613,21 @@ Mat3<double>& NNClassifier::get_Wr()
     return Wr;
 }
 
+double NNClassifier::sigmoid(double a)
+{
+    return 1.0 / (1 + exp(-a));
+}
+
+double NNClassifier::relu(double a)
+{
+    return max(a, 0.0);
+}
+
+double NNClassifier::leaky_relu(double a)
+{
+    return (a >= 0) ? a : (0.01 * a);
+}
+
 void NNClassifier::pre_compute()
 {
     // TODO
@@ -1724,7 +1759,8 @@ void NNClassifier::compute_scores(
     {
         // cerr << "Feed-forward the composition layers " << j << endl;
         // j = 0 | 1
-        int tok_w_root = features[compose_structure[j].find("w_root")->second];
+        // int tok_w_root = features[compose_structure[j].find("w_root")->second];
+        int tok_w_root = dsctree.get_root(j);
 
         // Mat<double> hiddens;
         unordered_map<int, Vec<double> > dscrnn;

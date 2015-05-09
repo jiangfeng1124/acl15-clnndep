@@ -127,6 +127,9 @@ class Config
 
         bool compose_weighted;
         bool compose_by_position;
+        int max_compose_layers;
+
+        int compose_activation;
 
         bool debug;
 
