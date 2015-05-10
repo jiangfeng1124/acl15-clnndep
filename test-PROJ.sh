@@ -10,9 +10,9 @@ f_output=$f_test.predict
 model=$src/model.proj/model
 f_conf=conf/nndep.cfg
 
-./nndep -cltest  $f_test \
-        -model $model \
-        -output $f_output \
-        -cfg $f_conf \
-        -clemb resources/projected/en-$tgt_lang/$tgt_lang.50
+./bin/nndep -cltest  $f_test \
+            -model $model \
+            -output $f_output \
+            -cfg $f_conf \
+            -clemb resources/projected/en-$tgt_lang/$tgt_lang.50
 
