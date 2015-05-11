@@ -17,9 +17,9 @@ fi
 f_model=$model_dir/model
 f_conf=conf/nndep.cfg
 
-./bin/nndep -train $f_train \
-            -dev $f_dev     \
-            -model $f_model \
-            -cfg $f_conf    \
-            -emb resources/cca/en-$lang/en.50.w2v
+./bin/clnndep -train $f_train \
+              -dev $f_dev     \
+              -model $f_model \
+              -cfg $f_conf    \
+              -emb resources/cca/en-$lang/en.50.w2v
 

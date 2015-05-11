@@ -10,7 +10,7 @@ Require: cmake (available in most Linux systems)
 
 ###Resources
 
-The cross-lingual word embeddings generated using PROJ/CCA can be downloaded from [here](https://drive.google.com/file/d/0B1z04ix6jD_Db3REdHlnREpjMmc/view?usp=sharing)
+The cross-lingual word embeddings generated using PROJ/CCA can be obtained from [here](https://drive.google.com/file/d/0B1z04ix6jD_Db3REdHlnREpjMmc/view?usp=sharing)
 
 ###Running the executable
 
