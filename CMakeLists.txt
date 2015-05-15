@@ -4,7 +4,7 @@ project ("CLNNDEP - Cross-lingual Dependency Parsing")
 set (CMAKE_MODULE_PATH ${PROJECT_SOURCE_DIR}/cmake)
 
 set (OMP true)
-set (DEBUG false)
+set (DEBUG true) # set false to speed up the program
 
 set(CMAKE_CXX_FLAGS "-std=c++11 -O3 -Wno-narrowing -fpermissive -pthread -lm")
 
