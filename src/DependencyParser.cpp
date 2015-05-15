@@ -1815,7 +1815,7 @@ void DependencyParser::load_model_cl(
         vector<string> sep = split(s);
 
         assert (sep.size() == Eb_size + 1);
-        assert (config.embedding_size == Eb_size + 1);
+        assert (config.embedding_size == Eb_size);
         if (sep[0] == Config::UNKNOWN
                 || sep[0] == Config::ROOT
                 || sep[0] == Config::NIL)
@@ -1868,7 +1868,7 @@ void DependencyParser::load_model_cl(
             known_distances.push_back(to_int(sep[0]));
 
             assert (sep.size() == Ed_size + 1);
-            assert (config.distance_embedding_size == Ed_size + 1);
+            assert (config.distance_embedding_size == Ed_size);
             for (int j = 0; j < Ed_size; ++j)
                 Ed[index][j] = to_double_sci(sep[j+1]);
             index += 1;
@@ -1883,7 +1883,7 @@ void DependencyParser::load_model_cl(
             known_valencies.push_back(sep[0]);
 
             assert (sep.size() == Ev_size + 1);
-            assert (config.valency_embedding_size == Ec_size + 1);
+            assert (config.valency_embedding_size == Ev_size);
             for (int j = 0; j < Ev_size; ++j)
                 Ev[index][j] = to_double_sci(sep[j+1]);
             index += 1;
@@ -1898,7 +1898,7 @@ void DependencyParser::load_model_cl(
             known_clusters.push_back(sep[0]);
 
             assert (sep.size() == Ec_size + 1);
-            assert (config.cluster_embedding_size == (Ec_size + 1));
+            assert (config.cluster_embedding_size == Ec_size);
             /*
             if (sep[0] == Config::UNKNOWN)
                 for (int j = 0; j < Ec_size; ++j)
