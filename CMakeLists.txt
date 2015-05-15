@@ -4,14 +4,19 @@ project ("CLNNDEP - Cross-lingual Dependency Parsing")
 set (CMAKE_MODULE_PATH ${PROJECT_SOURCE_DIR}/cmake)
 
 set (OMP true)
+set (DEBUG false)
+
+set(CMAKE_CXX_FLAGS "-std=c++11 -O3 -Wno-narrowing -fpermissive -pthread -lm")
 
 if (OMP)
-    message (STATUS "OpenMP is on.")
-    set(CMAKE_CXX_FLAGS "-std=c++11 -O3 -Wno-narrowing -fpermissive -pthread -lm -fopenmp")
-else (OMP)
-    message (STATUS "OpenMP is off.")
-    set(CMAKE_CXX_FLAGS "-std=c++11 -O3 -Wno-narrowing -fpermissive -pthread -lm")
+    message (STATUS "OpenMP is on")
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fopenmp")
 endif (OMP)
+
+if (NOT DEBUG)
+    message (STATUS "Debug-mode is off")
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DNDEBUG")
+endif (NOT DEBUG)
 
 set (EXECUTABLE_OUTPUT_PATH ${PROJECT_SOURCE_DIR}/bin)
 
