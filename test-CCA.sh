@@ -7,8 +7,7 @@ tgt=udt/$tgt_lang/
 f_test=$tgt/$tgt_lang-universal-test-brown-punc-p1.conll
 f_output=$f_test.predict
 
-#model=$src/model.cca.en-$tgt_lang/model
-model=$src/model.cca.en-$tgt_lang.clean.w2v.d.v.c10.d50.h400/model
+model=$src/model.cca.en-$tgt_lang/model
 f_conf=conf/nndep.cfg
 
 ./bin/clnndep -cltest  $f_test \
