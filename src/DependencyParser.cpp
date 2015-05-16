@@ -1426,73 +1426,24 @@ void DependencyParser::load_model(const char * filename, bool re_precompute)
     double start = get_time();
 
     ifstream input(filename);
-    int n_dict = 0, n_pos = 0, n_label = 0;
-    int n_dist = 0, n_valency = 0, n_cluster = 0;
-    int Eb_size = 0, Ed_size = 0, Ev_size = 0, Ec_size = 0;
-    int h_size = 0;
-    int n_basic_tokens = 0, n_dist_tokens = 0;
-    int n_valency_tokens = 0, n_cluster_tokens = 0;
-    int n_pre_computed = 0;
 
     string s;
-    for (int k = 0; k < 16; ++k)
-    {
-        getline(input, s);
-        vector<string> kv = split_by_sep(s, "=");
-        int val = to_int(kv[1]);
-        switch (k)
-        {
-            case 0:
-                n_dict = val;
-                break;
-            case 1:
-                n_pos = val;
-                break;
-            case 2:
-                n_label = val;
-                break;
-            case 3:
-                n_dist = val;
-                break;
-            case 4:
-                n_valency = val;
-                break;
-            case 5:
-                n_cluster = val;
-            case 6:
-                Eb_size = val;
-                break;
-            case 7:
-                Ed_size = val;
-                break;
-            case 8:
-                Ev_size = val;
-                break;
-            case 9:
-                Ec_size = val;
-                break;
-            case 10:
-                h_size = val;
-                break;
-            case 11:
-                n_basic_tokens = val;
-                break;
-            case 12:
-                n_dist_tokens = val;
-                break;
-            case 13:
-                n_valency_tokens = val;
-                break;
-            case 14:
-                n_cluster_tokens = val;
-                break;
-            case 15:
-                n_pre_computed = val;
-                break;
-            default:
-                break;
-        }
-    }
+    getline(input, s); int n_dict = to_int(split_by_sep(s, "=")[1]);
+    getline(input, s); int n_pos = to_int(split_by_sep(s, "=")[1]);
+    getline(input, s); int n_label = to_int(split_by_sep(s, "=")[1]);
+    getline(input, s); int n_dist = to_int(split_by_sep(s, "=")[1]);
+    getline(input, s); int n_valency = to_int(split_by_sep(s, "=")[1]);
+    getline(input, s); int n_cluster = to_int(split_by_sep(s, "=")[1]);
+    getline(input, s); int Eb_size = to_int(split_by_sep(s, "=")[1]);
+    getline(input, s); int Ed_size = to_int(split_by_sep(s, "=")[1]);
+    getline(input, s); int Ev_size = to_int(split_by_sep(s, "=")[1]);
+    getline(input, s); int Ec_size = to_int(split_by_sep(s, "=")[1]);
+    getline(input, s); int h_size = to_int(split_by_sep(s, "=")[1]);
+    getline(input, s); int n_basic_tokens = to_int(split_by_sep(s, "=")[1]);
+    getline(input, s); int n_dist_tokens = to_int(split_by_sep(s, "=")[1]);
+    getline(input, s); int n_valency_tokens = to_int(split_by_sep(s, "=")[1]);
+    getline(input, s); int n_cluster_tokens = to_int(split_by_sep(s, "=")[1]);
+    getline(input, s); int n_pre_computed = to_int(split_by_sep(s, "=")[1]);
 
     known_words.clear();
     known_poss.clear();
@@ -1664,8 +1615,7 @@ void DependencyParser::load_model(const char * filename, bool re_precompute)
         classifier = new NNClassifier(config, Eb, Ed, Ev, Ec, W1, b1, W2, pre_computed_ids);
 
     vector<string> ldict = known_labels;
-    if (config.labeled)
-        ldict.pop_back(); // remove the NIL label
+    if (config.labeled) ldict.pop_back(); // remove the NIL label
     system = new ArcStandard(ldict, config.language, config.labeled);
 
     if (!re_precompute && config.num_pre_computed > 0)
@@ -1695,73 +1645,24 @@ void DependencyParser::load_model_cl(
     double start = get_time();
 
     ifstream input(filename);
-    int n_dict = 0, n_pos = 0, n_label = 0;
-    int n_dist = 0, n_valency = 0, n_cluster = 0;
-    int Eb_size = 0, Ed_size = 0, Ev_size = 0, Ec_size = 0;
-    int h_size = 0;
-    int n_basic_tokens = 0, n_dist_tokens = 0;
-    int n_valency_tokens = 0, n_cluster_tokens = 0;
-    int n_pre_computed = 0;
 
     string s;
-    for (int k = 0; k < 16; ++k)
-    {
-        getline(input, s);
-        vector<string> kv = split_by_sep(s, "=");
-        int val = to_int(kv[1]);
-        switch (k)
-        {
-            case 0:
-                n_dict = val;
-                break;
-            case 1:
-                n_pos = val;
-                break;
-            case 2:
-                n_label = val;
-                break;
-            case 3:
-                n_dist = val;
-                break;
-            case 4:
-                n_valency = val;
-                break;
-            case 5:
-                n_cluster = val;
-            case 6:
-                Eb_size = val;
-                break;
-            case 7:
-                Ed_size = val;
-                break;
-            case 8:
-                Ev_size = val;
-                break;
-            case 9:
-                Ec_size = val;
-                break;
-            case 10:
-                h_size = val;
-                break;
-            case 11:
-                n_basic_tokens = val;
-                break;
-            case 12:
-                n_dist_tokens = val;
-                break;
-            case 13:
-                n_valency_tokens = val;
-                break;
-            case 14:
-                n_cluster_tokens = val;
-                break;
-            case 15:
-                n_pre_computed = val;
-                break;
-            default:
-                break;
-        }
-    }
+    getline(input, s); int n_dict = to_int(split_by_sep(s, "=")[1]);
+    getline(input, s); int n_pos = to_int(split_by_sep(s, "=")[1]);
+    getline(input, s); int n_label = to_int(split_by_sep(s, "=")[1]);
+    getline(input, s); int n_dist = to_int(split_by_sep(s, "=")[1]);
+    getline(input, s); int n_valency = to_int(split_by_sep(s, "=")[1]);
+    getline(input, s); int n_cluster = to_int(split_by_sep(s, "=")[1]);
+    getline(input, s); int Eb_size = to_int(split_by_sep(s, "=")[1]);
+    getline(input, s); int Ed_size = to_int(split_by_sep(s, "=")[1]);
+    getline(input, s); int Ev_size = to_int(split_by_sep(s, "=")[1]);
+    getline(input, s); int Ec_size = to_int(split_by_sep(s, "=")[1]);
+    getline(input, s); int h_size = to_int(split_by_sep(s, "=")[1]);
+    getline(input, s); int n_basic_tokens = to_int(split_by_sep(s, "=")[1]);
+    getline(input, s); int n_dist_tokens = to_int(split_by_sep(s, "=")[1]);
+    getline(input, s); int n_valency_tokens = to_int(split_by_sep(s, "=")[1]);
+    getline(input, s); int n_cluster_tokens = to_int(split_by_sep(s, "=")[1]);
+    getline(input, s); int n_pre_computed = to_int(split_by_sep(s, "=")[1]);
 
     // verification
     if (n_dist_tokens == 0) assert (n_dist == 0);

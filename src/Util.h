@@ -43,9 +43,7 @@ class Util
                 input[i_swap] = temp;
             }
 
-            // typename std::vector<T>::const_iterator beg = input.begin();
             auto beg = input.begin();
-            // typename std::vector<T>::const_iterator end = input.begin() + subset_size;
             auto end = input.begin() + subset_size;
             std::vector<T> subset(beg, end);
             return subset;
@@ -80,20 +78,15 @@ class Util
                 end_pos2 = minibatch_size - (end_pos1 - cursor);
             }
 
-            // typename std::vector<T>::const_iterator beg1 = input.begin() + cursor;
-            // typename std::vector<T>::const_iterator end1 = input.begin() + end_pos1;
             auto beg1 = input.begin() + cursor;
             auto end1 = input.begin() + end_pos1;
             std::vector<T> subvec1 = std::vector<T>(beg1, end1);
 
-            // typename std::vector<T>::const_iterator beg2 = input.begin();
-            // typename std::vector<T>::const_iterator end2 = input.begin() + end_pos2;
             auto beg2 = input.begin();
             auto end2 = input.begin() + end_pos2;
             std::vector<T> subvec2 = std::vector<T>(beg2, end2);
 
             output.reserve(subvec1.size() + subvec2.size());
-            // output = std::vector<T>(beg, end);
             output.insert(output.end(), subvec1.begin(), subvec1.end());
             if (end_pos2 > 0)
                 output.insert(output.end(), subvec2.begin(), subvec2.end());
@@ -105,7 +98,6 @@ class Util
                 std::vector< std::vector<T> > & output,
                 int num_chunks)
         {
-            // TODO
             output.clear();
             int chunk_size = input.size() / num_chunks;
             int remainder = input.size() % num_chunks;
@@ -117,9 +109,7 @@ class Util
                 if (i < remainder)
                     end ++;
 
-                // typename std::vector<T>::const_iterator l = input.begin() + start;
                 auto l = input.begin() + start;
-                // typename std::vector<T>::const_iterator r = input.begin() + end;
                 auto r = input.begin() + end;
                 output.push_back(std::vector<T>(l, r));
 
