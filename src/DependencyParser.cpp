@@ -1799,7 +1799,7 @@ void DependencyParser::load_model_cl(
             known_clusters.push_back(sep[0]);
 
             assert (sep.size() == Ec_size + 1);
-            assert (config.cluster_embedding_size == Ec_size + 1);
+            assert (config.cluster_embedding_size == Ec_size);
             /*
             if (sep[0] == Config::UNKNOWN)
                 for (int j = 0; j < Ec_size; ++j)
