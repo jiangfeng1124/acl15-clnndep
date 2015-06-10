@@ -2,7 +2,7 @@
 Jiang Guo, jiangfeng1124@gmail.com
 
 This parser can be used both for monolingual and cross-lingual dependency parsing.
-The monolingual component has been optimized and integrated into *[LTP](https://github.com/HIT-SCIR/ltp)*.
+The monolingual component has been optimized and integrated into **[LTP](https://github.com/HIT-SCIR/ltp)**.
 
 ###Compile
 
