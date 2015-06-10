@@ -10,7 +10,9 @@ Require: cmake (available in most Linux systems)
 
 ###Resources
 
-Alignment dictionaries: ```resources/align/PROJ``` (target->source) and ```resources/align/CCA``` (source->target).
+Alignment dictionaries:
+* ```resources/align/PROJ``` (target->source)
+* ```resources/align/CCA``` (source->target).
 
 Note that the <b>EN</b> word embeddings in PROJ are used only for initialization, they get updated/finetuned while training.
 
