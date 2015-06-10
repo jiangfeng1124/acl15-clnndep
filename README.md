@@ -25,3 +25,14 @@ For CCA: `./train-CCA.sh`
 
 Learning parameters are defined in ```conf/nndep.cfg```.
 
+###Reference
+
+```
+@InProceedings{Guo:2015:clnndep,
+  author    = {Guo, Jiang and Che, Wanxiang and Yarowsky, David and Wang, Haifeng and Liu, Ting},
+  title     = {Cross-lingual Dependency Parsing Based on Distributed Representations},
+  booktitle = {Proceedings of ACL},
+  year      = {2015},
+}
+```
+
