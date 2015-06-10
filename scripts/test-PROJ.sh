@@ -20,11 +20,13 @@ if [ "$cls" = "1" ]; then
     echo "Test PROJ+Cluster"
     model_dir=$models/model.proj.cls
     f_conf=conf/proj-dvc.cfg
+    # projected word embeddings in target language
     f_emb=resources/proj-replicate/$lang/$lang.50.proj.cls.pp
 else
     echo "Test PROJ"
     model_dir=$models/model.proj
     f_conf=conf/proj-dv.cfg
+    # projected word embeddings in target language
     f_emb=resources/proj-replicate/$lang/$lang.50.proj.pp
 fi
 
