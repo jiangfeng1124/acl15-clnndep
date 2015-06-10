@@ -1,6 +1,9 @@
 ##Cross-lingual Dependency Parsing Based on Distributed Representations
 Jiang Guo, jiangfeng1124@gmail.com
 
+This parser can be used both for monolingual and cross-lingual dependency parsing.
+The monolingual component has been optimized and integrated into *[LTP](https://github.com/HIT-SCIR/ltp)*.
+
 ###Compile
 
 Require: cmake (available in most Linux systems)
