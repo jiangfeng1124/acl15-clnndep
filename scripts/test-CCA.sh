@@ -1,18 +1,36 @@
 #!/bin/bash
 
-tgt_lang=$1
-src=udt/en/
-tgt=udt/$tgt_lang/
+if [ $# -ne 2 ]; then
+    echo "Usage: ./train.sh [lang] [cls|0,1]"
+    exit -1
+fi
 
-f_test=$tgt/$tgt_lang-universal-test-brown-punc-p1.conll
+lang=$1
+cls=$2
+
+src=udt/en/
+tgt=udt/$lang/
+
+models=models/
+
+f_test=$tgt/$lang-universal-test-brown-punc-p1.conll
 f_output=$f_test.predict
 
-model=$src/model.cca.en-$tgt_lang/model
-f_conf=conf/nndep.cfg
+if [ "$cls" = "1" ]; then
+    echo "Test CCA+Cluster"
+    model_dir=$models/model.cca.cls.en-$lang
+    f_conf=conf/cca-dvc.cfg
+else
+    echo "Test CCA"
+    model_dir=$models/model.cca.en-$lang
+    f_conf=conf/cca-dv.cfg
+fi
 
-./bin/clnndep -cltest  $f_test \
-              -model $model \
+f_model=$model_dir/model
+
+./bin/clnndep -cltest $f_test \
+              -model $f_model \
               -output $f_output \
               -cfg $f_conf \
-              -clemb resources/cca/en-$tgt_lang/$tgt_lang.50.w2v
+              -clemb resources/cca/en-$lang/$lang.50.w2v
 

@@ -1,18 +1,38 @@
 #!/bin/bash
 
-tgt_lang=$1
-src=udt/en/
-tgt=udt/$tgt_lang/
+if [ $# -ne 2 ]; then
+    echo "Usage: ./train.sh [lang] [cls|0,1]"
+    exit -1
+fi
 
-f_test=$tgt/$tgt_lang-universal-test-brown.conll
+lang=$1
+cls=$2
+
+src=udt/en/
+tgt=udt/$lang/
+
+models=models/
+
+f_test=$tgt/$lang-universal-test-brown-punc-p1.conll
 f_output=$f_test.predict
 
-model=$src/model.proj/model
-f_conf=conf/nndep.cfg
+if [ "$cls" = "1" ]; then
+    echo "Test PROJ+Cluster"
+    model_dir=$models/model.proj.cls
+    f_conf=conf/proj-dvc.cfg
+    f_emb=resources/proj-replicate/$lang/$lang.50.proj.cls.pp
+else
+    echo "Test PROJ"
+    model_dir=$models/model.proj
+    f_conf=conf/proj-dv.cfg
+    f_emb=resources/proj-replicate/$lang/$lang.50.proj.pp
+fi
+
+f_model=$model_dir/model
 
 ./bin/clnndep -cltest  $f_test \
-              -model $model \
+              -model $f_model \
               -output $f_output \
               -cfg $f_conf \
-              -clemb resources/projected/en-$tgt_lang/$tgt_lang.50
+              -clemb $f_emb
 

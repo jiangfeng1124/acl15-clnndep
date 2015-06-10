@@ -10,7 +10,8 @@ Require: cmake (available in most Linux systems)
 
 ###Resources
 
-The cross-lingual word embeddings generated using PROJ/CCA can be obtained from [here](https://drive.google.com/file/d/0B1z04ix6jD_Db3REdHlnREpjMmc/view?usp=sharing).
+Alignment dictionaries: ```resources/align/PROJ``` (target->source) and ```resources/align/CCA``` (source->target).
+
 Note that the <b>EN</b> word embeddings in PROJ are used only for initialization, they get updated/finetuned while training.
 
 ###Running the executable
