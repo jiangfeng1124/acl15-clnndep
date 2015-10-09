@@ -34,5 +34,5 @@ f_model=$model_dir/model
               -dev $f_dev     \
               -model $f_model \
               -cfg $f_conf    \
-              -emb resources/projected/en/en.50
+              -emb resources/projected/en.50
 
