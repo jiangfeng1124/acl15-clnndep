@@ -17,14 +17,17 @@ Alignment dictionaries:
 * ```resources/align/PROJ``` (target->source)
 * ```resources/align/CCA``` (source->target).
 
+Unzip the embeddings:
+* ```cd resources && unzip acl15-cl-wemb.zip && mv acl15-cl-wemb/cca cca && mv acl15-cl-wemb/projected projected && rm -r acl15-cl-wemb && cd ..```
+
 Note that the <b>EN</b> word embeddings in PROJ are used only for initialization, they get updated/finetuned while training.
 
 ###Running the executable
 
-For robust projection: `./train-PROJ.sh`
+For robust projection: `./scripts/train-PROJ.sh`
 * set `fix_word_embeddings=false` (```conf/nndep.cfg```)
 
-For CCA: `./train-CCA.sh`
+For CCA: `./scripts/train-CCA.sh`
 
 Learning parameters are defined in ```conf/nndep.cfg```.
 
